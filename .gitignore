@@ -1,0 +1,28 @@
+# Salida de compilación de .NET
+bin/
+obj/
+
+# Resultados / paquetes
+[Dd]ebug/
+[Rr]elease/
+*.nupkg
+artifacts/
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Secretos locales (por si algún día añades claves de API en la nube)
+appsettings.*.local.json
+*.secrets.json
+
+# Notas internas de Claude Code (no forman parte del proyecto)
+CLAUDE.md
