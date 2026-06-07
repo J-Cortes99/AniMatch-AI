@@ -1,0 +1,50 @@
+// Estado de la aplicación + persistencia en localStorage. No toca el DOM: las funciones
+// solo mutan datos; quien llama se encarga de repintar. Las listas son 'const' (nunca se
+// reasignan, solo se mutan con push/splice/length=0) para poder importarse como binding vivo.
+
+const CLAVE_FAV = 'animes_favoritos';
+const CLAVE_DESC = 'animes_descartados';
+const CLAVE_PEND = 'animes_pendientes';
+
+export const favoritos = JSON.parse(localStorage.getItem(CLAVE_FAV) || '[]');
+// Descartados y pendientes guardan el objeto anime completo (para verlos con carátula).
+// Migramos datos antiguos de descartados que solo guardaban el título.
+export const descartados = JSON.parse(localStorage.getItem(CLAVE_DESC) || '[]')
+  .map(d => typeof d === 'string' ? { titulo: d } : d);
+export const pendientes = JSON.parse(localStorage.getItem(CLAVE_PEND) || '[]');
+export const recomendaciones = [];   // lo que hay ahora en pantalla (se limpia con .length = 0)
+
+export const guardarFavoritos = () => localStorage.setItem(CLAVE_FAV, JSON.stringify(favoritos));
+export const guardarDescartados = () => localStorage.setItem(CLAVE_DESC, JSON.stringify(descartados));
+export const guardarPendientes = () => localStorage.setItem(CLAVE_PEND, JSON.stringify(pendientes));
+
+const norm = t => (t || '').toLowerCase().trim();
+
+export const yaEsFavorito = titulo => favoritos.some(f => norm(f) === norm(titulo));
+export const estaPendiente = titulo => pendientes.some(p => norm(p.titulo) === norm(titulo));
+
+// Añade un favorito (sin duplicados). Devuelve true si lo añadió.
+export function agregarFavorito(titulo) {
+  const t = (titulo || '').trim();
+  if (!t || yaEsFavorito(t)) return false;
+  favoritos.push(t);
+  guardarFavoritos();
+  return true;
+}
+
+// Guarda o quita de pendientes (toggle). Persiste.
+export function alternarPendiente(a) {
+  const k = pendientes.findIndex(p => norm(p.titulo) === norm(a.titulo));
+  if (k >= 0) pendientes.splice(k, 1); else pendientes.push(a);
+  guardarPendientes();
+}
+
+// ¿Se puede mostrar este título? (no descartado, ni pendiente, ni ya en pantalla)
+export function esPermitido(titulo) {
+  const prohibidos = new Set([
+    ...descartados.map(d => d.titulo),
+    ...pendientes.map(p => p.titulo),
+    ...recomendaciones.map(r => r.titulo),
+  ].map(norm));
+  return !prohibidos.has(norm(titulo));
+}

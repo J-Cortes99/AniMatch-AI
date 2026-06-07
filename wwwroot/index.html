@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0d0b09">
+  <title>AniMatch · Recomendador de anime</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <div class="kana-deco" aria-hidden="true">アニメ推薦</div>
+
+  <div class="wrap">
+    <header class="masthead">
+      <div class="kicker"><span>ローカルAI</span><span class="linea"></span><span>Recomendador de anime</span></div>
+      <h1 class="logo">Ani<span>Match</span></h1>
+      <div class="regla"></div>
+      <p class="lema">Tu GPU elige por ti, en local. Carátulas y fichas cortesía de MyAnimeList.</p>
+      <div class="estado" id="estado" title="Pulsa para volver a comprobar">
+        <span class="punto"></span><span id="estadoTexto">Comprobando Ollama…</span>
+      </div>
+    </header>
+
+    <section class="entrada-wrap">
+      <label class="seccion-label" for="entrada"><b>お気に入り</b>Tus animes favoritos</label>
+      <div class="campo">
+        <input id="entrada" placeholder="Escribe un anime y elígelo de la lista…" autocomplete="off">
+        <div class="sugerencias" id="sugerencias" hidden></div>
+      </div>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <div class="controls">
+      <label class="num">N.º
+        <select id="cantidad"><option>3</option><option selected>5</option><option>8</option></select>
+      </label>
+      <button id="btn" class="btn-primario">Recomiéndame</button>
+      <button id="cancelar" class="btn-sec" type="button" hidden>Cancelar</button>
+      <button id="verPendientes" class="btn-sec crece" type="button">Pendientes (0)</button>
+      <button id="verDescartados" class="btn-sec" type="button">Descartados (0)</button>
+      <button id="exportar" class="btn-sec" type="button" disabled>Exportar PNG</button>
+    </div>
+
+    <div id="resultados" class="resultados"></div>
+  </div>
+
+  <!-- Modal: lista de animes descartados -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Descartados</h2>
+        <button class="cerrar" id="cerrarModal" title="Cerrar" type="button">✕</button>
+      </div>
+      <p class="vacio-msg" id="descVacio" hidden>No has descartado ningún anime todavía.</p>
+      <div class="lista-pend" id="listaDesc"></div>
+    </div>
+  </div>
+
+  <!-- Modal: lista de pendientes (watchlist) -->
+  <div class="overlay" id="pendientesOverlay" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Pendientes</h2>
+        <button class="cerrar" id="cerrarPend" title="Cerrar" type="button">✕</button>
+      </div>
+      <p class="vacio-msg" id="pendVacio" hidden>Aún no has guardado ningún anime. Pulsa ☆ en una recomendación.</p>
+      <div class="lista-pend" id="listaPend"></div>
+    </div>
+  </div>
+
+  <!-- Modal: ficha de detalle de un anime -->
+  <div class="overlay" id="detalleOverlay" hidden>
+    <div class="modal detalle">
+      <button class="cerrar cerrar-flotante" id="cerrarDetalle" title="Cerrar" type="button">✕</button>
+      <div id="detalleBody"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

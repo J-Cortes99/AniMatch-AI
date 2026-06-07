@@ -1,0 +1,323 @@
+:root{
+  --tinta:#0d0b09; --tinta-2:#15120d; --tinta-3:#1d1812;
+  --papel:#efe7d4; --papel-2:#c8bea6; --tenue:#8b8270;
+  --bermellon:#ec3b2b; --bermellon-osc:#5e160f;
+  --borde:#332c20;
+  color-scheme: dark;
+}
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  font-family:"Zen Kaku Gothic New", system-ui, sans-serif;
+  background:var(--tinta); color:var(--papel);
+  margin:0; padding:0; line-height:1.62; overflow-x:hidden;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+/* Atmósfera: resplandor bermellón + viñeta */
+body::before{
+  content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+  background:
+    radial-gradient(120% 85% at 88% -12%, rgba(236,59,43,.18), transparent 55%),
+    radial-gradient(110% 75% at -10% 115%, rgba(236,59,43,.05), transparent 55%);
+}
+/* Trama de semitono (puntitos de manga) */
+body::after{
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.5;
+  background-image: radial-gradient(rgba(239,231,212,.05) 1px, transparent 1.5px);
+  background-size:7px 7px;
+}
+::selection{ background:var(--bermellon); color:var(--papel); }
+
+.wrap{ max-width:760px; margin:0 auto; padding:2.6rem 1.2rem 5rem; position:relative; z-index:1; }
+
+/* Acento japonés vertical de fondo */
+.kana-deco{
+  position:fixed; top:0; right:max(.5rem, calc((100vw - 760px) / 2 - 3.4rem));
+  writing-mode:vertical-rl; font-family:"Shippori Mincho", serif; font-weight:800;
+  font-size:clamp(3.4rem, 9vw, 6.5rem); letter-spacing:.12em; padding-top:1.6rem;
+  color:rgba(239,231,212,.045); pointer-events:none; z-index:0; user-select:none;
+}
+
+/* ---- Masthead ---- */
+.masthead{ margin-bottom:2.4rem; }
+.kicker{
+  display:flex; align-items:center; gap:.8rem; margin-bottom:1rem;
+  font-family:"Anton",sans-serif; font-size:.72rem; letter-spacing:.3em;
+  text-transform:uppercase; color:var(--bermellon);
+}
+.kicker .linea{ flex:1; height:2px; background:linear-gradient(90deg,var(--bermellon),transparent); }
+.logo{
+  font-family:"Anton",sans-serif; font-weight:400; margin:0; text-transform:uppercase;
+  font-size:clamp(3.4rem, 13vw, 6.4rem); line-height:.84; letter-spacing:.005em; color:var(--papel);
+}
+.logo span{ color:var(--bermellon); }
+.regla{ height:5px; width:clamp(120px,40%,260px); background:var(--bermellon); margin:.7rem 0 0; }
+.lema{
+  font-family:"Shippori Mincho", serif; font-style:italic; font-size:1.05rem;
+  color:var(--papel-2); margin:1rem 0 1.3rem; max-width:46ch;
+}
+.estado{
+  display:inline-flex; align-items:center; gap:.55rem; cursor:pointer; user-select:none;
+  font-size:.8rem; color:var(--tenue); background:var(--tinta-2);
+  border:1.5px solid var(--borde); padding:.42rem .8rem; border-radius:2px; transition:border-color .2s;
+}
+.estado:hover{ border-color:var(--papel-2); }
+.estado .punto{
+  width:9px; height:9px; border-radius:50%; background:#5a6072; flex:0 0 auto;
+  animation:latido 2.2s ease-in-out infinite;
+}
+@keyframes latido{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.3); } }
+
+/* ---- Entrada / favoritos ---- */
+.seccion-label{
+  display:block; font-family:"Anton",sans-serif; letter-spacing:.2em; text-transform:uppercase;
+  font-size:.74rem; color:var(--tenue); margin-bottom:.55rem;
+}
+.seccion-label b{ color:var(--bermellon); font-weight:400; margin-right:.5rem; }
+#entrada{
+  width:100%; font-family:inherit; font-size:1.18rem; color:var(--papel);
+  background:transparent; border:none; border-bottom:2.5px solid var(--borde);
+  padding:.6rem .15rem; outline:none; transition:border-color .25s;
+}
+#entrada::placeholder{ color:var(--tenue); }
+#entrada:focus{ border-color:var(--bermellon); }
+.chips{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; }
+.chip{
+  display:inline-flex; align-items:center; gap:.5rem; background:var(--tinta-2);
+  border:1.5px solid var(--borde); border-left:3px solid var(--bermellon); color:var(--papel);
+  border-radius:2px; padding:.34rem .7rem; font-size:.88rem;
+}
+.chip span{ cursor:pointer; color:var(--tenue); font-size:.78rem; line-height:1; }
+.chip span:hover{ color:var(--bermellon); }
+
+/* Autocompletado de favoritos */
+.campo{ position:relative; }
+.sugerencias{
+  position:absolute; left:0; right:0; top:100%; z-index:20; margin-top:.4rem;
+  background:var(--tinta-2); border:1.5px solid var(--borde); border-radius:3px;
+  max-height:340px; overflow-y:auto; box-shadow:0 14px 34px rgba(0,0,0,.55);
+}
+.sugerencias[hidden]{ display:none; }
+.sugerencias::-webkit-scrollbar{ width:8px; }
+.sugerencias::-webkit-scrollbar-thumb{ background:var(--borde); border-radius:4px; }
+.sug-item{ display:flex; align-items:center; gap:.7rem; padding:.45rem .6rem; cursor:pointer; }
+.sug-item:hover, .sug-item.activa{ background:var(--tinta-3); }
+.sug-poster{ width:32px; height:44px; flex:0 0 auto; object-fit:cover; border-radius:2px;
+  background:var(--tinta-3); display:block; }
+.sug-titulo{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-size:.95rem; color:var(--papel); }
+.sug-anio{ flex:0 0 auto; font-family:"Anton",sans-serif; font-size:.74rem; color:var(--tenue); }
+
+/* ---- Controles / botones ---- */
+.controls{ display:flex; gap:.7rem; align-items:center; flex-wrap:wrap; margin:1.6rem 0 2.2rem; }
+.controls .crece{ margin-left:auto; }
+.num{
+  display:inline-flex; align-items:center; gap:.5rem; color:var(--tenue);
+  font-family:"Anton",sans-serif; letter-spacing:.12em; text-transform:uppercase; font-size:.8rem;
+}
+select{
+  font-family:inherit; background:var(--tinta-2); color:var(--papel);
+  border:1.5px solid var(--borde); border-radius:2px; padding:.45rem .55rem; cursor:pointer;
+}
+button{
+  font-family:"Anton",sans-serif; cursor:pointer; border-radius:2px; letter-spacing:.07em;
+  text-transform:uppercase; border:2px solid transparent;
+  transition:transform .12s ease, box-shadow .12s ease, background .2s, color .2s, border-color .2s;
+}
+.btn-primario{
+  background:var(--bermellon); color:var(--papel); border-color:var(--tinta);
+  padding:.72rem 1.5rem; font-size:1.05rem; box-shadow:4px 4px 0 var(--bermellon-osc);
+}
+.btn-primario:hover:not(:disabled){ transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--bermellon-osc); }
+.btn-primario:active:not(:disabled){ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--bermellon-osc); }
+.btn-primario:disabled{ opacity:.65; cursor:default; box-shadow:none; }
+.btn-sec{
+  background:transparent; color:var(--papel-2); border-color:var(--borde); padding:.62rem 1.1rem; font-size:.92rem;
+}
+.btn-sec:hover:not(:disabled){ border-color:var(--bermellon); color:var(--bermellon); }
+.btn-sec:disabled{ opacity:.45; cursor:default; }
+
+/* ---- Tarjetas (viñetas de manga) ---- */
+.resultados{ display:flex; flex-direction:column; gap:1rem; }
+.card{
+  position:relative; display:flex; gap:1.1rem; overflow:hidden; cursor:pointer;
+  background:var(--tinta-2); border:2px solid var(--borde); border-radius:3px; padding:1.1rem 1.2rem;
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.card:hover{ transform:translateY(-3px); border-color:var(--bermellon); box-shadow:7px 7px 0 rgba(236,59,43,.16); }
+.indice{
+  position:absolute; right:.5rem; bottom:-1.3rem; font-family:"Anton",sans-serif;
+  font-size:5.4rem; line-height:1; color:rgba(239,231,212,.045); pointer-events:none; z-index:0;
+}
+.poster{
+  width:96px; flex:0 0 auto; align-self:stretch; object-fit:cover; border-radius:2px;
+  border:1.5px solid rgba(13,11,9,.55); background:var(--tinta-3); z-index:1;
+}
+.card-cuerpo{ flex:1; min-width:0; position:relative; z-index:1; }
+.card-titulo{
+  font-family:"Shippori Mincho", serif; font-weight:800; font-size:1.28rem; line-height:1.2;
+  margin:0 0 .45rem; padding-right:7rem; color:var(--papel);
+}
+.meta{
+  display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; margin:0 0 .55rem;
+  font-family:"Anton",sans-serif; letter-spacing:.06em; font-size:.8rem; color:var(--papel-2);
+}
+.meta .nota{ color:var(--bermellon); }
+.meta .sep{ color:var(--tenue); }
+.card-motivo{ margin:0; color:var(--papel-2); font-size:.97rem; }
+.card-motivo strong{ color:var(--bermellon); font-weight:700; }
+.gen{ margin-top:.7rem; display:flex; flex-wrap:wrap; gap:.4rem; }
+.gen small{
+  font-family:"Anton",sans-serif; letter-spacing:.08em; text-transform:uppercase; font-size:.66rem;
+  color:var(--papel-2); border:1.5px solid var(--borde); border-radius:2px;
+  padding:.2rem .48rem; background:rgba(13,11,9,.4);
+}
+.favorito, .descartar, .pendiente{
+  position:absolute; top:.7rem; width:30px; height:30px; border-radius:2px; z-index:2;
+  display:grid; place-items:center; border:1.5px solid var(--borde); background:var(--tinta-3);
+  color:var(--papel-2); cursor:pointer; padding:0; font-size:.95rem; line-height:1;
+  font-family:system-ui, sans-serif; transition:all .15s;
+}
+.descartar{ right:.6rem; }
+.descartar:hover{ border-color:var(--papel-2); color:var(--papel); background:var(--tinta); }
+.favorito{ right:2.7rem; }
+/* "+" como icono SVG: nítido e idéntico en todas las tarjetas (sin redondeos de subpíxel) */
+.favorito .ico-mas{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.favorito:hover{ border-color:var(--bermellon); color:var(--bermellon); }
+.favorito:disabled{ background:var(--bermellon); border-color:var(--bermellon); color:var(--papel); cursor:default; }
+.pendiente{ right:4.8rem; font-size:1.05rem; }
+.pendiente:hover{ border-color:var(--bermellon); color:var(--bermellon); }
+.pendiente.activo{ border-color:var(--bermellon); color:var(--bermellon); }
+
+/* Tarjetas de estado (cargando / aviso) */
+.card.cargando, .card.aviso{
+  border-style:dashed; color:var(--tenue); font-family:"Shippori Mincho", serif; font-style:italic;
+  align-items:center; gap:.65rem; cursor:default;
+}
+.card.cargando:hover, .card.aviso:hover{ transform:none; box-shadow:none; border-color:var(--borde); }
+/* Loader: "speed lines" de manga (líneas cinéticas barriendo el fondo de la tarjeta) */
+.card.cargando{
+  overflow:hidden;
+  background: repeating-linear-gradient(100deg, transparent 0 7px, rgba(236,59,43,.13) 7px 8px), var(--tinta-2);
+  background-size: 64px 100%, 100% 100%;
+  animation: speedlines .5s linear infinite;
+}
+@keyframes speedlines{ from{ background-position:0 0, 0 0; } to{ background-position:-64px 0, 0 0; } }
+.card.cargando .kana{ font-style:normal; font-weight:700; color:var(--bermellon); letter-spacing:.06em; }
+
+/* Entrada escalonada al cargar y al aparecer cada tarjeta */
+@keyframes surge{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; } }
+.masthead{ animation:surge .6s cubic-bezier(.2,.9,.25,1) both; }
+.entrada-wrap{ position:relative; z-index:30; animation:surge .6s cubic-bezier(.2,.9,.25,1) both .08s; }
+.controls{ animation:surge .6s cubic-bezier(.2,.9,.25,1) both .16s; }
+@keyframes entra{ from{ opacity:0; transform:translateY(18px) rotate(-1.2deg); } to{ opacity:1; transform:translateY(0) rotate(0); } }
+.card.nueva{ animation:entra .5s cubic-bezier(.2,.9,.25,1) both; }
+/* Sello de tinta al guardar en pendientes */
+.sello{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; z-index:6; }
+.sello span{
+  display:grid; place-items:center; width:78px; height:78px; border-radius:50%;
+  border:3px solid var(--bermellon); color:var(--bermellon);
+  box-shadow:inset 0 0 0 2px rgba(236,59,43,.45); background:rgba(236,59,43,.08);
+  font-size:2.3rem; transform:rotate(-13deg); animation:sello 1s ease forwards;
+}
+@keyframes sello{
+  0%{ opacity:0; transform:rotate(-13deg) scale(1.9); }
+  16%{ opacity:1; transform:rotate(-13deg) scale(.92); }
+  30%{ transform:rotate(-13deg) scale(1.04); }
+  45%{ transform:rotate(-13deg) scale(1); }
+  78%{ opacity:1; }
+  100%{ opacity:0; transform:rotate(-13deg) scale(1); }
+}
+
+/* ---- Modales ---- */
+.overlay{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:1rem;
+  background:rgba(8,7,6,.78); backdrop-filter:blur(3px); animation:fundido .25s ease both;
+}
+@keyframes fundido{ from{ opacity:0; } to{ opacity:1; } }
+.overlay[hidden]{ display:none; }
+.modal{
+  background:var(--tinta-2); border:2px solid var(--bermellon); border-radius:3px;
+  width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column;
+  padding:1.5rem; box-shadow:10px 10px 0 rgba(236,59,43,.18);
+}
+.modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:.3rem; }
+.modal-head h2{
+  font-family:"Anton",sans-serif; text-transform:uppercase; letter-spacing:.05em;
+  font-size:1.35rem; margin:0; color:var(--papel);
+}
+.cerrar{ background:transparent; border:none; color:var(--tenue); font-size:1.3rem; cursor:pointer; padding:.2rem .4rem; }
+.cerrar:hover{ color:var(--bermellon); }
+.modal .vacio-msg{ color:var(--tenue); font-style:italic; font-family:"Shippori Mincho", serif; margin:.6rem 0; }
+
+/* ---- Listas de mini-fichas (pendientes / descartados) ---- */
+.lista-pend{ overflow-y:auto; display:flex; flex-direction:column; gap:.5rem; margin:.8rem 0; }
+.lista-pend::-webkit-scrollbar{ width:8px; }
+.lista-pend::-webkit-scrollbar-thumb{ background:var(--borde); border-radius:4px; }
+.pend-item{
+  display:flex; align-items:center; gap:.7rem; cursor:pointer; transition:border-color .15s;
+  background:var(--tinta-3); border:1.5px solid var(--borde); border-left:3px solid var(--bermellon);
+  border-radius:2px; padding:.5rem .6rem;
+}
+.pend-item:hover{ border-color:var(--bermellon); }
+.pend-poster{ width:42px; height:58px; flex:0 0 auto; object-fit:cover; border-radius:2px; background:var(--tinta-2); }
+.pend-info{ flex:1; min-width:0; }
+.pend-titulo{
+  font-family:"Shippori Mincho", serif; font-weight:700; font-size:.98rem; color:var(--papel);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pend-info .meta{ margin:.2rem 0 0; font-size:.72rem; }
+.quitar-pend{ flex:0 0 auto; background:transparent; border:none; color:var(--tenue); cursor:pointer; font-size:1rem; padding:0 .3rem; }
+.quitar-pend:hover{ color:var(--bermellon); }
+
+/* ---- Ficha de detalle ---- */
+#detalleOverlay{ z-index:60; }   /* por encima del modal de pendientes */
+.modal.detalle{ max-width:640px; max-height:88vh; padding:0; position:relative; }
+.cerrar-flotante{ position:absolute; top:.6rem; right:.7rem; z-index:3; background:rgba(13,11,9,.65); border-radius:2px; }
+#detalleBody{ flex:1; min-height:0; overflow-y:auto; padding:1.5rem; }
+#detalleBody::-webkit-scrollbar{ width:8px; }
+#detalleBody::-webkit-scrollbar-thumb{ background:var(--borde); border-radius:4px; }
+.det-cab{ display:flex; gap:1.2rem; margin-bottom:.4rem; }
+.det-poster{ width:130px; flex:0 0 auto; border-radius:3px; border:1.5px solid rgba(13,11,9,.55); align-self:flex-start; }
+.det-info{ flex:1; min-width:0; }
+.det-titulo{ font-family:"Shippori Mincho", serif; font-weight:800; font-size:1.5rem; line-height:1.18;
+  margin:0 0 .5rem; color:var(--papel); padding-right:1.6rem; }
+.det-mal{ display:inline-block; margin-top:.7rem; font-family:"Anton",sans-serif; letter-spacing:.06em;
+  text-transform:uppercase; font-size:.78rem; color:var(--bermellon); text-decoration:none; }
+.det-mal:hover{ text-decoration:underline; }
+.det-bloque{ margin-top:1.3rem; }
+.det-bloque .et{ display:block; font-family:"Anton",sans-serif; letter-spacing:.18em; text-transform:uppercase;
+  font-size:.72rem; color:var(--tenue); margin-bottom:.45rem; }
+.det-bloque p{ margin:0; color:var(--papel-2); }
+.det-bloque p strong{ color:var(--bermellon); font-weight:700; }
+.btn-traducir{
+  margin-top:.7rem; background:transparent; border:1.5px solid var(--borde); color:var(--papel-2);
+  padding:.4rem .85rem; font-family:"Anton",sans-serif; font-size:.74rem; letter-spacing:.08em;
+  text-transform:uppercase; border-radius:2px; cursor:pointer; transition:all .15s;
+}
+.btn-traducir:hover:not(:disabled){ border-color:var(--bermellon); color:var(--bermellon); }
+.btn-traducir:disabled{ opacity:.6; cursor:default; }
+.link-sinopsis{
+  display:inline-block; margin-top:.6rem; background:none; border:none; padding:0; cursor:pointer;
+  font-family:"Anton",sans-serif; letter-spacing:.06em; text-transform:uppercase; font-size:.72rem; color:var(--tenue);
+}
+.link-sinopsis:hover{ color:var(--bermellon); }
+.yt-facade{ position:relative; display:block; width:100%; aspect-ratio:16/9; overflow:hidden;
+  border:1.5px solid var(--borde); border-radius:3px; background-color:var(--tinta-3);
+  background-size:cover; background-position:center; cursor:pointer; padding:0; }
+.yt-facade::after{ content:""; position:absolute; inset:0; z-index:0; background:rgba(8,7,6,.3); transition:background .2s; }
+.yt-facade:hover::after{ background:rgba(8,7,6,.1); }
+.yt-play{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2;
+  width:60px; height:60px; border-radius:50%; background:var(--bermellon); color:var(--papel);
+  display:grid; place-items:center; font-size:1.4rem; padding-left:4px;
+  box-shadow:0 6px 22px rgba(236,59,43,.45); transition:transform .2s; }
+.yt-facade:hover .yt-play{ transform:translate(-50%,-50%) scale(1.08); }
+.yt-embed{ position:relative; width:100%; aspect-ratio:16/9; }
+.yt-embed iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; border-radius:3px; }
+@media (max-width:520px){ .det-cab{ flex-direction:column; } .det-poster{ width:120px; } }
+
+@media (max-width:980px){ .kana-deco{ display:none; } }
+@media (max-width:520px){
+  .poster{ width:74px; }
+  .card-titulo{ padding-right:6.8rem; }
+}
