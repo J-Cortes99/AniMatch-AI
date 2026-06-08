@@ -7,4 +7,5 @@ public record PeticionRecomendacion(
     string[]? Descartados = null,
     string[]? YaMostrados = null,
     string[]? Pendientes = null,
-    int Cantidad = 5);
+    int Cantidad = 5,
+    Filtros? Filtros = null);

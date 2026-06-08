@@ -40,10 +40,48 @@
       </label>
       <button id="btn" class="btn-primario">Recomiéndame</button>
       <button id="cancelar" class="btn-sec" type="button" hidden>Cancelar</button>
-      <button id="verPendientes" class="btn-sec crece" type="button">Pendientes (0)</button>
+      <button id="verFiltros" class="btn-sec crece" type="button" aria-expanded="false">Filtros</button>
+      <button id="verPendientes" class="btn-sec" type="button">Pendientes (0)</button>
       <button id="verDescartados" class="btn-sec" type="button">Descartados (0)</button>
       <button id="exportar" class="btn-sec" type="button" disabled>Exportar PNG</button>
     </div>
+
+    <section class="filtros" id="panelFiltros" hidden>
+      <div class="filtros-grid">
+        <label class="f-campo">Formato
+          <select id="fFormato">
+            <option value="todo">Todo</option>
+            <option value="tv">Series (TV)</option>
+            <option value="pelicula">Películas</option>
+          </select>
+        </label>
+        <label class="f-campo">Duración
+          <select id="fDuracion">
+            <option value="cualquiera">Cualquiera</option>
+            <option value="corta">Corta (≤13 ep.)</option>
+            <option value="media">Media (14–26)</option>
+            <option value="larga">Larga (&gt;26)</option>
+          </select>
+        </label>
+        <label class="f-campo">Nota mínima
+          <select id="fNota">
+            <option value="0">Cualquiera</option>
+            <option value="7">7 o más</option>
+            <option value="7.5">7,5 o más</option>
+            <option value="8">8 o más</option>
+          </select>
+        </label>
+        <label class="f-check"><input type="checkbox" id="fSinEspeciales"> Sin OVAs / especiales</label>
+      </div>
+      <div class="f-generos">
+        <span class="f-label">Excluir géneros</span>
+        <div class="f-gen-buscar">
+          <input id="fGenBuscar" type="text" placeholder="Busca un género y añádelo…" autocomplete="off">
+          <div class="sugerencias f-gen-sug" id="fGenSug" hidden></div>
+        </div>
+        <div class="f-chips" id="fGenSel"></div>
+      </div>
+    </section>
 
     <div id="resultados" class="resultados"></div>
   </div>

@@ -1,8 +1,8 @@
 // Punto de entrada: estado de UI, render, modales y manejadores de eventos.
 import { esc, escNegrita, filaMeta, miniFichaHTML, sello } from './util.js';
 import {
-  favoritos, descartados, pendientes, recomendaciones,
-  guardarFavoritos, guardarDescartados, guardarPendientes,
+  favoritos, descartados, pendientes, recomendaciones, filtros,
+  guardarFavoritos, guardarDescartados, guardarPendientes, guardarFiltros,
   agregarFavorito, alternarPendiente, estaPendiente, yaEsFavorito, esPermitido,
 } from './estado.js';
 import { salud, buscar, traducir, pedirStream } from './api.js';
@@ -13,9 +13,9 @@ const $ = id => document.getElementById(id);
 // Estado de la interfaz (escalares; viven aquí porque se reasignan).
 let cargandoMsg = null;     // texto de la tarjeta "cargando" (null = ninguna)
 let mensajeVacio = null;    // texto cuando no hay resultados (null = ninguno)
+let notaFinal = null;       // aviso al pie (p. ej. "con tus filtros solo encontré 3 de 5")
 let abortador = null;       // AbortController de la generación en curso (null = nada en curso)
 let detalleActual = null;   // anime mostrado ahora en el modal de detalle
-let ocupado = false;
 
 // ---- Chips de favoritos ----
 function pintarChips() {
@@ -94,6 +94,111 @@ async function comprobarEstado() {
 }
 $('estado').onclick = comprobarEstado;
 
+// ---- Filtros ----
+// Catálogo completo de MyAnimeList (géneros + temas + demografía): [etiqueta en español, nombre exacto de MAL].
+// El nombre de MAL (en inglés) es lo que entiende el backend; la etiqueta es lo que ve el usuario.
+const GENEROS = [
+  ['Acción', 'Action'], ['Reparto adulto', 'Adult Cast'], ['Aventura', 'Adventure'],
+  ['Antropomórfico', 'Anthropomorphic'], ['Vanguardia', 'Avant Garde'], ['Premiado', 'Award Winning'],
+  ['Boys Love (BL)', 'Boys Love'], ['Chicas monas (CGDCT)', 'CGDCT'], ['Cuidado infantil', 'Childcare'],
+  ['Deportes de combate', 'Combat Sports'], ['Comedia', 'Comedy'], ['Travestismo', 'Crossdressing'],
+  ['Delincuentes', 'Delinquents'], ['Detectives', 'Detective'], ['Drama', 'Drama'], ['Ecchi', 'Ecchi'],
+  ['Educativo', 'Educational'], ['Erótico', 'Erotica'], ['Fantasía', 'Fantasy'], ['Humor absurdo', 'Gag Humor'],
+  ['Girls Love (Yuri)', 'Girls Love'], ['Gore', 'Gore'], ['Gastronomía', 'Gourmet'], ['Harén', 'Harem'],
+  ['Hentai', 'Hentai'], ['Juego de alto riesgo', 'High Stakes Game'], ['Histórico', 'Historical'],
+  ['Terror', 'Horror'], ['Idols (chicas)', 'Idols (Female)'], ['Idols (chicos)', 'Idols (Male)'],
+  ['Isekai', 'Isekai'], ['Iyashikei (relajante)', 'Iyashikei'], ['Josei', 'Josei'], ['Infantil', 'Kids'],
+  ['Triángulo amoroso', 'Love Polygon'], ['Romance estático', 'Love Status Quo'],
+  ['Cambio de sexo mágico', 'Magical Sex Shift'], ['Chica mágica (Mahou Shoujo)', 'Mahou Shoujo'],
+  ['Artes marciales', 'Martial Arts'], ['Mecha', 'Mecha'], ['Médico', 'Medical'], ['Militar', 'Military'],
+  ['Música', 'Music'], ['Misterio', 'Mystery'], ['Mitología', 'Mythology'], ['Crimen organizado', 'Organized Crime'],
+  ['Cultura otaku', 'Otaku Culture'], ['Parodia', 'Parody'], ['Artes escénicas', 'Performing Arts'],
+  ['Mascotas', 'Pets'], ['Psicológico', 'Psychological'], ['Carreras', 'Racing'], ['Reencarnación', 'Reincarnation'],
+  ['Harén inverso', 'Reverse Harem'], ['Romance', 'Romance'], ['Samuráis', 'Samurai'], ['Escolar', 'School'],
+  ['Ciencia ficción', 'Sci-Fi'], ['Seinen', 'Seinen'], ['Shoujo', 'Shoujo'], ['Shounen', 'Shounen'],
+  ['Mundo del espectáculo', 'Showbiz'], ['Recuentos de la vida', 'Slice of Life'], ['Espacio', 'Space'],
+  ['Deportes', 'Sports'], ['Juego de estrategia', 'Strategy Game'], ['Superpoderes', 'Super Power'],
+  ['Sobrenatural', 'Supernatural'], ['Supervivencia', 'Survival'], ['Suspense', 'Suspense'],
+  ['Deportes de equipo', 'Team Sports'], ['Viajes en el tiempo', 'Time Travel'], ['Fantasía urbana', 'Urban Fantasy'],
+  ['Vampiros', 'Vampire'], ['Videojuegos', 'Video Game'], ['Villana', 'Villainess'], ['Artes visuales', 'Visual Arts'],
+  ['Trabajo / oficina', 'Workplace'],
+];
+const ETIQUETA_GEN = Object.fromEntries(GENEROS.map(([es, mal]) => [mal, es]));
+const normGen = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+
+let genSug = [], genSugActiva = -1;
+
+// Chips de los géneros ya excluidos (tachados, con ✕ para quitar).
+function pintarGenerosSel() {
+  $('fGenSel').innerHTML = filtros.generosExcluidos.map(mal =>
+    `<button type="button" class="f-gen activo" data-mal="${esc(mal)}" title="Quitar exclusión">${esc(ETIQUETA_GEN[mal] || mal)} ✕</button>`
+  ).join('');
+}
+// Sugerencias del buscador: filtra el catálogo por etiqueta o nombre de MAL, sin los ya elegidos.
+function pintarGenSug(q) {
+  const t = normGen(q);
+  genSug = t
+    ? GENEROS.filter(([es, mal]) =>
+        !filtros.generosExcluidos.includes(mal) &&
+        (normGen(es).includes(t) || mal.toLowerCase().includes(t))).slice(0, 8)
+    : [];
+  if (genSugActiva >= genSug.length) genSugActiva = -1;
+  if (!genSug.length) { $('fGenSug').hidden = true; $('fGenSug').innerHTML = ''; return; }
+  $('fGenSug').innerHTML = genSug.map(([es, mal], i) =>
+    `<div class="f-sug-item${i === genSugActiva ? ' activa' : ''}" data-mal="${esc(mal)}">${esc(es)}</div>`).join('');
+  $('fGenSug').hidden = false;
+}
+function excluirGenero(mal) {
+  if (mal && !filtros.generosExcluidos.includes(mal)) filtros.generosExcluidos.push(mal);
+  guardarFiltros();
+  $('fGenBuscar').value = ''; genSugActiva = -1; pintarGenSug('');
+  pintarGenerosSel(); actualizarBotonFiltros();
+}
+function contarFiltros() {
+  return (filtros.formato !== 'todo') + (filtros.duracion !== 'cualquiera')
+    + (filtros.notaMinima > 0) + (filtros.sinEspeciales ? 1 : 0) + filtros.generosExcluidos.length;
+}
+function actualizarBotonFiltros() {
+  const n = contarFiltros();
+  $('verFiltros').textContent = n ? `Filtros (${n})` : 'Filtros';
+  $('verFiltros').classList.toggle('con-filtros', n > 0);
+}
+function inicializarFiltros() {
+  $('fFormato').value = filtros.formato;
+  $('fDuracion').value = filtros.duracion;
+  $('fNota').value = String(filtros.notaMinima || 0);
+  $('fSinEspeciales').checked = !!filtros.sinEspeciales;
+  pintarGenerosSel();
+  actualizarBotonFiltros();
+}
+$('verFiltros').onclick = () => {
+  const oculto = $('panelFiltros').hidden;
+  $('panelFiltros').hidden = !oculto;
+  $('verFiltros').setAttribute('aria-expanded', String(oculto));
+};
+$('fFormato').onchange = e => { filtros.formato = e.target.value; guardarFiltros(); actualizarBotonFiltros(); };
+$('fDuracion').onchange = e => { filtros.duracion = e.target.value; guardarFiltros(); actualizarBotonFiltros(); };
+$('fNota').onchange = e => { filtros.notaMinima = parseFloat(e.target.value) || 0; guardarFiltros(); actualizarBotonFiltros(); };
+$('fSinEspeciales').onchange = e => { filtros.sinEspeciales = e.target.checked; guardarFiltros(); actualizarBotonFiltros(); };
+
+// Buscador de géneros a excluir (autocompletado local sobre el catálogo de MAL).
+$('fGenBuscar').oninput = e => { genSugActiva = -1; pintarGenSug(e.target.value); };
+$('fGenBuscar').onkeydown = e => {
+  if (e.key === 'ArrowDown' && genSug.length) { e.preventDefault(); genSugActiva = (genSugActiva + 1) % genSug.length; pintarGenSug(e.target.value); return; }
+  if (e.key === 'ArrowUp' && genSug.length)   { e.preventDefault(); genSugActiva = (genSugActiva - 1 + genSug.length) % genSug.length; pintarGenSug(e.target.value); return; }
+  if (e.key === 'Enter') { e.preventDefault(); const p = genSugActiva >= 0 ? genSug[genSugActiva] : genSug[0]; if (p) excluirGenero(p[1]); return; }
+  if (e.key === 'Escape') { $('fGenSug').hidden = true; genSugActiva = -1; }
+};
+$('fGenSug').onclick = e => { const it = e.target.closest('.f-sug-item'); if (it) excluirGenero(it.dataset.mal); };
+$('fGenSel').onclick = e => {
+  const b = e.target.closest('.f-gen');
+  if (!b) return;
+  const i = filtros.generosExcluidos.indexOf(b.dataset.mal);
+  if (i >= 0) filtros.generosExcluidos.splice(i, 1);
+  guardarFiltros(); pintarGenerosSel(); actualizarBotonFiltros(); pintarGenSug($('fGenBuscar').value);
+};
+document.addEventListener('click', e => { if (!e.target.closest('.f-gen-buscar')) $('fGenSug').hidden = true; });
+
 // ---- Pintar recomendaciones (con tarjeta de "cargando"/"sin resultados" al final) ----
 function pintarRecomendaciones() {
   const cards = recomendaciones.map((a, i) => {
@@ -123,23 +228,29 @@ function pintarRecomendaciones() {
     ? `<div class="card cargando"><span class="kana">生成中</span> ${esc(cargandoMsg)}</div>` : '';
   const vacio = (!recomendaciones.length && !cargandoMsg && mensajeVacio)
     ? `<div class="card aviso">${esc(mensajeVacio)}</div>` : '';
-  $('resultados').innerHTML = cards + cargando + vacio;
+  const nota = (notaFinal && !cargandoMsg && recomendaciones.length)
+    ? `<div class="card aviso">${esc(notaFinal)}</div>` : '';
+  $('resultados').innerHTML = cards + cargando + vacio + nota;
   $('exportar').disabled = recomendaciones.length === 0;
 }
 
 // Pide recomendaciones hasta tener 'objetivo' en pantalla, reintentando: el modelo
 // a veces devuelve menos de lo pedido, y el filtro puede quitar duplicados/descartados.
-async function completarHasta(objetivo, mensaje, signal, maxIntentos = 6) {
+async function completarHasta(objetivo, mensaje, signal, maxIntentos = 8) {
+  const filtrando = contarFiltros() > 0;
   let intentos = 0, vacios = 0;
   while (recomendaciones.length < objetivo && intentos < maxIntentos) {
     cargandoMsg = mensaje;
     pintarRecomendaciones();
     const faltan = objetivo - recomendaciones.length;
-    // Colchón de +2 solo cuando el filtro puede quitar algo (hay descartados o ya hay
-    // tarjetas en pantalla); en una primera ronda limpia pedimos justo lo que falta.
-    const colchon = (descartados.length || recomendaciones.length) ? 2 : 0;
+    // El filtro duro contra MAL tira muchos candidatos (tipo/nota/duración/género) y el modelo
+    // no conoce esos datos con exactitud. Con filtros pedimos un lote MÁS grande para que, tras
+    // filtrar, queden N en una o dos rondas en vez de muchas (más rápido y llega a N más veces).
+    // Sin filtros basta el colchón pequeño de antes.
+    const colchon = filtrando ? Math.max(4, faltan) : ((descartados.length || recomendaciones.length) ? 2 : 0);
+    const pedir = Math.min(faltan + colchon, 12);
     let añadidos = 0;
-    await pedirStream(faltan + colchon, a => {
+    await pedirStream(pedir, a => {
       if (recomendaciones.length < objetivo && esPermitido(a.titulo)) {
         recomendaciones.push(a); añadidos++;
         if (recomendaciones.length >= objetivo) cargandoMsg = null;  // completos: fuera "Generando…"
@@ -166,11 +277,12 @@ $('btn').onclick = async () => {
   const btn = $('btn'); btn.disabled = true; btn.textContent = 'Pensando…';
   $('cancelar').hidden = false;
   recomendaciones.length = 0;            // la lista negra (descartados) se mantiene
-  mensajeVacio = null;
+  mensajeVacio = null; notaFinal = null;
+  const objetivo = +$('cantidad').value;
   abortador = new AbortController();
   let cancelado = false;
   try {
-    await completarHasta(+$('cantidad').value, 'Generando recomendaciones…', abortador.signal);
+    await completarHasta(objetivo, 'Generando recomendaciones…', abortador.signal);
   } catch (err) {
     if (err.name === 'AbortError') {
       cancelado = true;                  // cancelado a propósito: conservamos lo recibido
@@ -186,6 +298,8 @@ $('btn').onclick = async () => {
     mensajeVacio = cancelado
       ? 'Generación cancelada.'
       : 'No encontré recomendaciones nuevas. Prueba a quitar animes de Descartados o a cambiar tus favoritos.';
+  else if (!cancelado && recomendaciones.length < objetivo && contarFiltros() > 0)
+    notaFinal = `Con tus filtros solo encontré ${recomendaciones.length} de ${objetivo}. Relaja algún filtro para ver más.`;
   pintarRecomendaciones();
 };
 
@@ -214,27 +328,16 @@ $('resultados').onclick = async e => {
     }
     return;
   }
-  // ✕ Descartar y traer un sustituto
+  // ✕ Descartar: solo quita la tarjeta (no regenera; pulsa "Recomiéndame" para una tanda nueva)
   const boton = e.target.closest('.descartar');
   if (boton) {
-    if (ocupado || abortador) return;   // ignora descartes si hay una generación en curso
-    ocupado = true;
+    if (abortador) return;   // ignora descartes mientras hay una generación en curso
     const i = +boton.dataset.i;
     descartados.push(recomendaciones[i]);          // objeto completo (carátula en el modal)
     guardarDescartados();
     actualizarContadorDesc();
-    const objetivo = recomendaciones.length;       // tras quitar una, volvemos al mismo total
-    recomendaciones.splice(i, 1);                  // fuera de pantalla
+    recomendaciones.splice(i, 1);                  // fuera de pantalla, sin sustituto
     pintarRecomendaciones();
-    try {
-      await completarHasta(objetivo, 'Buscando otra recomendación…');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      cargandoMsg = null;
-      ocupado = false;
-      pintarRecomendaciones();
-    }
     return;
   }
   // Clic en el resto de la tarjeta → abrir la ficha de detalle
@@ -382,6 +485,7 @@ $('exportar').onclick = exportarPng;
 
 // ---- Arranque ----
 pintarChips();
+inicializarFiltros();
 actualizarContadorDesc();
 actualizarContadorPend();
 comprobarEstado();

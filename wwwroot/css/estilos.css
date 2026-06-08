@@ -136,6 +136,55 @@ button{
 }
 .btn-sec:hover:not(:disabled){ border-color:var(--bermellon); color:var(--bermellon); }
 .btn-sec:disabled{ opacity:.45; cursor:default; }
+.btn-sec.con-filtros{ border-color:var(--bermellon); color:var(--bermellon); }
+
+/* ---- Panel de filtros ---- */
+.filtros{
+  background:var(--tinta-2); border:2px solid var(--borde); border-radius:3px;
+  padding:1.2rem 1.3rem; margin:-.8rem 0 2.2rem;
+  animation:surge .3s cubic-bezier(.2,.9,.25,1) both;
+}
+.filtros[hidden]{ display:none; }
+.filtros-grid{ display:flex; flex-wrap:wrap; gap:1rem 1.4rem; align-items:end; }
+.f-campo{
+  display:flex; flex-direction:column; gap:.4rem;
+  font-family:"Anton",sans-serif; letter-spacing:.1em; text-transform:uppercase;
+  font-size:.72rem; color:var(--tenue);
+}
+.f-campo select{ font-size:.92rem; min-width:150px; }
+.f-check{
+  display:inline-flex; align-items:center; gap:.5rem; cursor:pointer; align-self:end; padding-bottom:.5rem;
+  font-family:"Anton",sans-serif; letter-spacing:.06em; text-transform:uppercase;
+  font-size:.78rem; color:var(--papel-2); user-select:none;
+}
+.f-check input{ accent-color:var(--bermellon); width:16px; height:16px; cursor:pointer; }
+.f-generos{ margin-top:1.2rem; border-top:1.5px solid var(--borde); padding-top:1rem; }
+.f-label{
+  display:block; font-family:"Anton",sans-serif; letter-spacing:.18em; text-transform:uppercase;
+  font-size:.72rem; color:var(--tenue); margin-bottom:.6rem;
+}
+.f-chips{ display:flex; flex-wrap:wrap; gap:.4rem; }
+.f-gen{
+  font-family:"Anton",sans-serif; letter-spacing:.08em; text-transform:uppercase; font-size:.68rem;
+  color:var(--papel-2); border:1.5px solid var(--borde); border-radius:2px;
+  padding:.28rem .55rem; background:rgba(13,11,9,.4); transition:all .15s;
+}
+.f-gen:hover{ border-color:var(--papel-2); color:var(--papel); }
+.f-gen.activo{
+  background:var(--bermellon); border-color:var(--bermellon); color:var(--papel);
+  text-decoration:line-through; text-decoration-thickness:1.5px;
+}
+/* Buscador de géneros (autocompletado local sobre el catálogo de MAL) */
+.f-gen-buscar{ position:relative; max-width:340px; margin-bottom:.75rem; }
+.f-gen-buscar input{
+  width:100%; font-family:inherit; font-size:.95rem; color:var(--papel);
+  background:var(--tinta-3); border:1.5px solid var(--borde); border-radius:2px;
+  padding:.5rem .65rem; outline:none; transition:border-color .2s;
+}
+.f-gen-buscar input::placeholder{ color:var(--tenue); }
+.f-gen-buscar input:focus{ border-color:var(--bermellon); }
+.f-sug-item{ padding:.45rem .65rem; cursor:pointer; font-size:.92rem; color:var(--papel); }
+.f-sug-item:hover, .f-sug-item.activa{ background:var(--tinta-3); }
 
 /* ---- Tarjetas (viñetas de manga) ---- */
 .resultados{ display:flex; flex-direction:column; gap:1rem; }

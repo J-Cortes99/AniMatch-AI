@@ -37,7 +37,7 @@ public sealed class JikanService
     }
 
     public async Task<Anime?> EnriquecerAsync(
-        Anime anime, IEnumerable<string> exclusiones, CancellationToken ct)
+        Anime anime, IEnumerable<string> exclusiones, Filtros? filtros, CancellationToken ct)
     {
         Ficha? ficha;
         try
@@ -58,6 +58,11 @@ public sealed class JikanService
         foreach (var ex in exclusiones)
             if (titulos.Any(t => MismaSerie(t, ex)))
                 return null;
+
+        // Filtro duro contra los datos reales de MAL (tipo, géneros, nota, episodios) +
+        // bloqueo de contenido adulto por defecto.
+        if (!PasaFiltro(ficha, filtros))
+            return null;
 
         return anime with
         {
@@ -168,6 +173,52 @@ public sealed class JikanService
         return s.Trim();
     }
 
+    // ---- Filtro duro contra los datos de MyAnimeList ----
+    private static readonly string[] TiposEspeciales = { "OVA", "ONA", "Special", "Music" };
+
+    private static bool PasaFiltro(Ficha ficha, Filtros? f)
+    {
+        var generos = ficha.GenerosMal().ToList();
+
+        // Bloqueo de contenido adulto SIEMPRE (por defecto): fuera Hentai / Rx.
+        if ((ficha.Rating ?? "").StartsWith("Rx", StringComparison.OrdinalIgnoreCase)
+            || generos.Any(g => g.Equals("Hentai", StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        if (f is null) return true;
+
+        var tipo = ficha.Type ?? "";
+
+        // A. Formato
+        if (f.Formato == "tv" && !tipo.Equals("TV", StringComparison.OrdinalIgnoreCase)) return false;
+        if (f.Formato == "pelicula" && !tipo.Equals("Movie", StringComparison.OrdinalIgnoreCase)) return false;
+        if (f.SinEspeciales && TiposEspeciales.Contains(tipo, StringComparer.OrdinalIgnoreCase)) return false;
+
+        // B. Géneros excluidos (nombres de MAL en inglés; incluye géneros, temas y demografía)
+        if (f.GenerosExcluidos is { Length: > 0 }
+            && generos.Any(g => f.GenerosExcluidos.Contains(g, StringComparer.OrdinalIgnoreCase)))
+            return false;
+
+        // C. Nota mínima de MAL. Si no tiene nota, no podemos garantizarla → fuera.
+        if (f.NotaMinima is > 0 && !(ficha.Score >= f.NotaMinima)) return false;
+
+        // D. Duración por nº de episodios. Si es desconocido, no lo podemos clasificar → fuera.
+        if (f.Duracion is "corta" or "media" or "larga")
+        {
+            if (ficha.Episodes is not { } ep) return false;
+            var ok = f.Duracion switch
+            {
+                "corta" => ep <= 13,
+                "media" => ep is > 13 and <= 26,
+                "larga" => ep > 26,
+                _ => true,
+            };
+            if (!ok) return false;
+        }
+
+        return true;
+    }
+
     // ---- Comparación de "misma serie" (igual a la del frontend) ----
     private static string Norm(string s) =>
         Regex.Replace((s ?? "").ToLowerInvariant(), @"[^\p{L}\p{N}]+", " ").Trim();
@@ -203,6 +254,11 @@ public sealed class JikanService
         public string? Synopsis { get; set; }
         public Trailer? Trailer { get; set; }
         public List<Studio>? Studios { get; set; }
+        public string? Type { get; set; }       // TV, Movie, OVA, ONA, Special, Music
+        public string? Rating { get; set; }      // "R - 17+…", "Rx - Hentai", etc.
+        public List<NombreMal>? Genres { get; set; }
+        public List<NombreMal>? Themes { get; set; }
+        public List<NombreMal>? Demographics { get; set; }
 
         public string? Imagen => Images?.Jpg?.ImageUrl;
         // El campo "year" a veces viene null; caemos a la fecha de emisión.
@@ -214,8 +270,19 @@ public sealed class JikanService
             if (Titles is not null) lista.AddRange(Titles.Select(t => t.Title));
             return lista.Where(t => !string.IsNullOrWhiteSpace(t))!;
         }
+
+        // Géneros + temas + demografía de MAL (todos cuentan para excluir por "género").
+        public IEnumerable<string> GenerosMal()
+        {
+            var todos = new List<NombreMal>();
+            if (Genres is not null) todos.AddRange(Genres);
+            if (Themes is not null) todos.AddRange(Themes);
+            if (Demographics is not null) todos.AddRange(Demographics);
+            return todos.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!);
+        }
     }
 
+    private sealed class NombreMal { public string? Name { get; set; } }
     private sealed class Titulo { public string? Type { get; set; } public string? Title { get; set; } }
     private sealed class Imagenes { public Imagen? Jpg { get; set; } }
     private sealed class Imagen { public string? ImageUrl { get; set; } public string? SmallImageUrl { get; set; } public string? LargeImageUrl { get; set; } }

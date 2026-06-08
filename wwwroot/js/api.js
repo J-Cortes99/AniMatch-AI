@@ -1,5 +1,16 @@
 // Llamadas al backend. pedirStream lee el estado para construir el cuerpo de la petición.
-import { favoritos, descartados, pendientes, recomendaciones } from './estado.js';
+import { favoritos, descartados, pendientes, recomendaciones, filtros } from './estado.js';
+
+// Pasa los filtros de la UI al formato que espera el backend (null = "sin filtrar por esto").
+function serializarFiltros() {
+  return {
+    formato: filtros.formato === 'todo' ? null : filtros.formato,
+    sinEspeciales: !!filtros.sinEspeciales,
+    generosExcluidos: filtros.generosExcluidos,
+    notaMinima: filtros.notaMinima || null,
+    duracion: filtros.duracion === 'cualquiera' ? null : filtros.duracion,
+  };
+}
 
 // GET /api/health → objeto de estado de Ollama.
 export async function salud() {
@@ -34,7 +45,8 @@ export async function pedirStream(cantidad, onAnime, signal) {
       descartados: descartados.map(d => d.titulo),
       pendientes: pendientes.map(p => p.titulo),
       yaMostrados: recomendaciones.map(r => r.titulo),
-      cantidad
+      cantidad,
+      filtros: serializarFiltros()
     })
   });
   if (!res.ok) {

@@ -66,7 +66,7 @@ public static class RecomendacionesEndpoints
                 // Enriquecemos con Jikan (carátula + ficha) y filtramos alucinaciones y
                 // duplicados de serie. Si Jikan está desactivado, pasamos el anime tal cual.
                 var anime = jOpts.Value.Habilitado
-                    ? await jikan.EnriquecerAsync(e.Current, exclusiones, ct)
+                    ? await jikan.EnriquecerAsync(e.Current, exclusiones, peticion.Filtros, ct)
                     : e.Current;
 
                 if (anime is not null)

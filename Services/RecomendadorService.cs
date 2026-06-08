@@ -85,9 +85,11 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<OllamaOptions
             ? $"\nYa tiene estos guardados para verlos más tarde; tampoco se los recomiendes: {string.Join(", ", peticion.Pendientes)}."
             : "";
 
+        var filtros = ConstruirFiltrosTexto(peticion.Filtros);
+
         return $$"""
             Eres un recomendador experto de anime.
-            Al usuario le gustaron estos animes: {{favoritos}}.{{descartados}}{{yaMostrados}}{{pendientes}}
+            Al usuario le gustaron estos animes: {{favoritos}}.{{descartados}}{{yaMostrados}}{{pendientes}}{{filtros}}
 
             Recomiéndale exactamente {{peticion.Cantidad}} animes que probablemente no
             haya visto, explicando por qué encajan con sus gustos.
@@ -114,5 +116,42 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<OllamaOptions
 
             Escribe en español. No inventes animes que no existan.
             """;
+    }
+
+    // Convierte los filtros del usuario en reglas para el prompt. No es la garantía final
+    // (eso lo hace el filtro duro contra MyAnimeList), pero reduce las recomendaciones
+    // que luego habría que descartar.
+    private static string ConstruirFiltrosTexto(Filtros? f)
+    {
+        if (f is null) return "";
+
+        var reglas = new List<string>();
+
+        if (f.Formato == "tv")
+            reglas.Add("Recomienda SOLO series de televisión (formato TV); nada de películas, OVAs ni especiales.");
+        else if (f.Formato == "pelicula")
+            reglas.Add("Recomienda SOLO películas de anime.");
+
+        if (f.SinEspeciales && f.Formato != "tv")
+            reglas.Add("No recomiendes OVAs, ONAs ni especiales.");
+
+        if (f.GenerosExcluidos is { Length: > 0 })
+            reglas.Add($"Evita por completo estos géneros: {string.Join(", ", f.GenerosExcluidos)}.");
+
+        if (f.NotaMinima is > 0)
+            reglas.Add($"Recomienda solo títulos bien valorados (nota en MyAnimeList de {f.NotaMinima:0.#} o superior).");
+
+        reglas.Add(f.Duracion switch
+        {
+            "corta" => "Prefiere series cortas, de una sola temporada (13 episodios o menos).",
+            "media" => "Prefiere series de duración media (entre 14 y 26 episodios).",
+            "larga" => "Prefiere series largas (más de 26 episodios).",
+            _ => "",
+        });
+
+        reglas.RemoveAll(string.IsNullOrEmpty);
+        return reglas.Count == 0
+            ? ""
+            : "\n\nRestricciones del usuario que DEBES respetar:\n- " + string.Join("\n- ", reglas);
     }
 }
