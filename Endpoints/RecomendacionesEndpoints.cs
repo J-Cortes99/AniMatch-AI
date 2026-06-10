@@ -25,8 +25,16 @@ public static class RecomendacionesEndpoints
             HttpContext http,
             CancellationToken ct) =>
         {
+            // Saneo de la entrada (acota tamaños y aplana saltos de línea) ANTES de tocar
+            // el modelo: sin favoritos válidos no hay nada que recomendar.
+            if (peticion.Saneada() is not { } p)
+            {
+                http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
             var modelo = mOpts.Value;
-            await using var e = recomendador.RecomendarStreamAsync(peticion, ct).GetAsyncEnumerator(ct);
+            await using var e = recomendador.RecomendarStreamAsync(p, ct).GetAsyncEnumerator(ct);
 
             // El primer MoveNext dispara la llamada al modelo: aquí cazamos los fallos
             // (proveedor caído, timeout) ANTES de escribir el cuerpo, para devolver un código
@@ -60,9 +68,9 @@ public static class RecomendacionesEndpoints
             http.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
 
             // Para el dedup por sinónimos: no recomendar nada de la misma serie que estos.
-            var exclusiones = (peticion.Favoritos ?? [])
-                .Concat(peticion.Descartados ?? [])
-                .Concat(peticion.Pendientes ?? [])
+            var exclusiones = p.Favoritos
+                .Concat(p.Descartados ?? [])
+                .Concat(p.Pendientes ?? [])
                 .ToArray();
 
             while (hay)
@@ -70,7 +78,7 @@ public static class RecomendacionesEndpoints
                 // Enriquecemos con Jikan (carátula + ficha) y filtramos alucinaciones y
                 // duplicados de serie. Si Jikan está desactivado, pasamos el anime tal cual.
                 var anime = jOpts.Value.Habilitado
-                    ? await jikan.EnriquecerAsync(e.Current, exclusiones, peticion.Filtros, ct)
+                    ? await jikan.EnriquecerAsync(e.Current, exclusiones, p.Filtros, ct)
                     : e.Current;
 
                 if (anime is not null)
