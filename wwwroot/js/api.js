@@ -1,5 +1,8 @@
 // Llamadas al backend. pedirStream lee el estado para construir el cuerpo de la petición.
-import { favoritos, descartados, pendientes, recomendaciones, filtros } from './estado.js';
+import { favoritos, descartados, pendientes, recomendaciones, filtros, MAX_POR_LISTA } from './estado.js';
+
+// El backend solo conserva los últimos MAX_POR_LISTA de cada lista: enviamos justo esos.
+const ultimos = lista => lista.slice(-MAX_POR_LISTA);
 
 // Pasa los filtros de la UI al formato que espera el backend (null = "sin filtrar por esto").
 function serializarFiltros() {
@@ -42,10 +45,10 @@ export async function pedirStream(cantidad, onAnime, signal) {
   const res = await fetch('/api/recomendaciones', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
     body: JSON.stringify({
-      favoritos,
-      descartados: descartados.map(d => d.titulo),
-      pendientes: pendientes.map(p => p.titulo),
-      yaMostrados: recomendaciones.map(r => r.titulo),
+      favoritos: ultimos(favoritos),
+      descartados: ultimos(descartados.map(d => d.titulo)),
+      pendientes: ultimos(pendientes.map(p => p.titulo)),
+      yaMostrados: ultimos(recomendaciones.map(r => r.titulo)),
       cantidad,
       filtros: serializarFiltros()
     })

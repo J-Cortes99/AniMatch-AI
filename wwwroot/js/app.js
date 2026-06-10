@@ -1,7 +1,7 @@
 // Punto de entrada: estado de UI, render, modales y manejadores de eventos.
 import { esc, escNegrita, filaMeta, miniFichaHTML, sello } from './util.js';
 import {
-  favoritos, descartados, pendientes, recomendaciones, filtros,
+  favoritos, descartados, pendientes, recomendaciones, filtros, MAX_POR_LISTA,
   guardarFavoritos, guardarDescartados, guardarPendientes, guardarFiltros,
   agregarFavorito, alternarPendiente, estaPendiente, yaEsFavorito, esPermitido,
 } from './estado.js';
@@ -23,6 +23,7 @@ function pintarChips() {
     `<div class="chip">${esc(a)}<span data-i="${i}">✕</span></div>`).join('');
 }
 function anadirFavorito(titulo) {
+  if (favoritos.length >= MAX_POR_LISTA) { alert(`Máximo ${MAX_POR_LISTA} favoritos.`); return; }
   if (agregarFavorito(titulo)) { pintarChips(); pintarRecomendaciones(); }
 }
 $('chips').onclick = e => {
@@ -248,7 +249,7 @@ async function completarHasta(objetivo, mensaje, signal, maxIntentos = 8) {
     // filtrar, queden N en una o dos rondas en vez de muchas (más rápido y llega a N más veces).
     // Sin filtros basta el colchón pequeño de antes.
     const colchon = filtrando ? Math.max(4, faltan) : ((descartados.length || recomendaciones.length) ? 2 : 0);
-    const pedir = Math.min(faltan + colchon, 12);
+    const pedir = Math.min(faltan + colchon, 10);   // 10 = tope de Cantidad en el backend
     let añadidos = 0;
     await pedirStream(pedir, a => {
       if (recomendaciones.length < objetivo && esPermitido(a.titulo)) {

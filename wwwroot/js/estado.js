@@ -26,13 +26,19 @@ export const guardarFiltros = () => localStorage.setItem(CLAVE_FILTROS, JSON.str
 
 const norm = t => (t || '').toLowerCase().trim();
 
+// Límites espejo del backend (PeticionRecomendacion.Saneada): el servidor recorta
+// igualmente; aquí solo evitamos enviar de más y avisamos al usuario a tiempo.
+export const MAX_POR_LISTA = 100;
+export const MAX_LARGO_TITULO = 150;
+
 export const yaEsFavorito = titulo => favoritos.some(f => norm(f) === norm(titulo));
 export const estaPendiente = titulo => pendientes.some(p => norm(p.titulo) === norm(titulo));
 
-// Añade un favorito (sin duplicados). Devuelve true si lo añadió.
+// Añade un favorito (sin duplicados, espacios colapsados, longitud acotada).
+// Devuelve true si lo añadió.
 export function agregarFavorito(titulo) {
-  const t = (titulo || '').trim();
-  if (!t || yaEsFavorito(t)) return false;
+  const t = (titulo || '').replace(/\s+/g, ' ').trim().slice(0, MAX_LARGO_TITULO);
+  if (!t || yaEsFavorito(t) || favoritos.length >= MAX_POR_LISTA) return false;
   favoritos.push(t);
   guardarFavoritos();
   return true;
