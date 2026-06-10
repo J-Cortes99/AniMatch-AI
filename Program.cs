@@ -133,10 +133,17 @@ builder.Services.AddHttpClient("jikan", c =>
     c.DefaultRequestHeaders.UserAgent.ParseAdd("AniMatch/1.0");
 });
 
+// --- Base de datos (Postgres) para las listas por usuario ---
+// Cadena por entorno: ConnectionStrings__AniMatch o ANIMATCH_DB. Sin ella, la app
+// funciona igual y las listas se quedan solo en el localStorage del navegador.
+if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("AniMatch")))
+    builder.Configuration["ConnectionStrings:AniMatch"] = Environment.GetEnvironmentVariable("ANIMATCH_DB");
+
 // --- Servicios de la aplicación ---
 builder.Services.AddSingleton<JikanService>();
 builder.Services.AddSingleton<RecomendadorService>();
 builder.Services.AddSingleton<TraduccionService>();
+builder.Services.AddSingleton<ListasService>();
 
 var app = builder.Build();
 
@@ -150,13 +157,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
+// Crea la tabla de usuarios si hay base de datos configurada.
+var listas = app.Services.GetRequiredService<ListasService>();
+await listas.InicializarAsync();
+
 // --- Endpoints (cada grupo en su archivo, en Endpoints/) ---
-app.MapCuenta(conGoogle);
+app.MapCuenta(conGoogle, listas.Disponible);
 app.MapRecomendaciones();
 app.MapSalud();
 app.MapTraduccion();
 app.MapBusqueda();
 app.MapImagen();
+app.MapListas();
 
 var serverUrl = builder.Configuration["ServerUrl"] ?? "http://localhost:5080";
 app.Run(serverUrl);

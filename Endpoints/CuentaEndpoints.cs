@@ -9,8 +9,9 @@ public static class CuentaEndpoints
 {
     // Sesión con Google (OAuth en el servidor, cookie propia): el navegador nunca ve
     // tokens. Si no hay credenciales configuradas (conGoogle=false), /api/me lo dice
-    // y el frontend simplemente no ofrece el login.
-    public static void MapCuenta(this IEndpointRouteBuilder app, bool conGoogle)
+    // y el frontend simplemente no ofrece el login. "listas" indica si hay base de
+    // datos para sincronizar las listas del usuario.
+    public static void MapCuenta(this IEndpointRouteBuilder app, bool conGoogle, bool conListas)
     {
         // GET /api/me — quién soy, o si el login está siquiera disponible.
         app.MapGet("/api/me", (HttpContext http) =>
@@ -21,10 +22,11 @@ public static class CuentaEndpoints
                 {
                     autenticado = true,
                     disponible = conGoogle,
+                    listas = conListas,
                     nombre = u.FindFirstValue(ClaimTypes.Name) ?? "",
                     foto = u.FindFirstValue("picture"),
                 })
-                : Results.Ok(new { autenticado = false, disponible = conGoogle });
+                : Results.Ok(new { autenticado = false, disponible = conGoogle, listas = conListas });
         });
 
         if (!conGoogle) return;

@@ -30,6 +30,21 @@ export async function salir() {
   await fetch('/api/logout', { method: 'POST' });
 }
 
+// GET /api/listas → las listas guardadas en la cuenta. Lanza si falla.
+export async function obtenerListas() {
+  const res = await fetch('/api/listas');
+  if (!res.ok) throw new Error('listas ' + res.status);
+  return res.json();
+}
+
+// PUT /api/listas → sube el estado actual completo a la cuenta.
+export async function subirListas() {
+  await fetch('/api/listas', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ favoritos, descartados, pendientes, filtros })
+  });
+}
+
 // GET /api/buscar?q= → lista de sugerencias [{titulo, anio, imagen}].
 export async function buscar(q) {
   const res = await fetch('/api/buscar?q=' + encodeURIComponent(q));

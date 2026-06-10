@@ -19,10 +19,32 @@ export const recomendaciones = [];   // lo que hay ahora en pantalla (se limpia 
 const FILTROS_DEF = { formato: 'todo', sinEspeciales: false, generosExcluidos: [], notaMinima: 0, duracion: 'cualquiera' };
 export const filtros = Object.assign({}, FILTROS_DEF, JSON.parse(localStorage.getItem(CLAVE_FILTROS) || '{}'));
 
-export const guardarFavoritos = () => localStorage.setItem(CLAVE_FAV, JSON.stringify(favoritos));
-export const guardarDescartados = () => localStorage.setItem(CLAVE_DESC, JSON.stringify(descartados));
-export const guardarPendientes = () => localStorage.setItem(CLAVE_PEND, JSON.stringify(pendientes));
-export const guardarFiltros = () => localStorage.setItem(CLAVE_FILTROS, JSON.stringify(filtros));
+// Aviso de cambios: app.js registra aquí la subida a la nube (con sesión iniciada).
+let alCambiar = null;
+export const notificarCambios = fn => { alCambiar = fn; };
+const avisar = () => alCambiar?.();
+
+export const guardarFavoritos = () => { localStorage.setItem(CLAVE_FAV, JSON.stringify(favoritos)); avisar(); };
+export const guardarDescartados = () => { localStorage.setItem(CLAVE_DESC, JSON.stringify(descartados)); avisar(); };
+export const guardarPendientes = () => { localStorage.setItem(CLAVE_PEND, JSON.stringify(pendientes)); avisar(); };
+export const guardarFiltros = () => { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(filtros)); avisar(); };
+
+// Sustituye el estado local por lo que llega de la cuenta (y lo persiste en
+// localStorage como caché, SIN disparar la subida: acaba de venir de allí).
+export function cargarListas(d) {
+  favoritos.length = 0; favoritos.push(...(d.favoritos || []));
+  descartados.length = 0;
+  descartados.push(...(d.descartados || []).map(x => typeof x === 'string' ? { titulo: x } : x));
+  pendientes.length = 0; pendientes.push(...(d.pendientes || []));
+  Object.assign(filtros, FILTROS_DEF, d.filtros || {});
+  localStorage.setItem(CLAVE_FAV, JSON.stringify(favoritos));
+  localStorage.setItem(CLAVE_DESC, JSON.stringify(descartados));
+  localStorage.setItem(CLAVE_PEND, JSON.stringify(pendientes));
+  localStorage.setItem(CLAVE_FILTROS, JSON.stringify(filtros));
+}
+
+export const hayDatosLocales = () =>
+  favoritos.length > 0 || descartados.length > 0 || pendientes.length > 0;
 
 const norm = t => (t || '').toLowerCase().trim();
 

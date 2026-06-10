@@ -4,8 +4,9 @@ import {
   favoritos, descartados, pendientes, recomendaciones, filtros, MAX_POR_LISTA,
   guardarFavoritos, guardarDescartados, guardarPendientes, guardarFiltros,
   agregarFavorito, alternarPendiente, estaPendiente, yaEsFavorito, esPermitido,
+  notificarCambios, cargarListas, hayDatosLocales,
 } from './estado.js';
-import { salud, buscar, traducir, pedirStream, me, salir } from './api.js';
+import { salud, buscar, traducir, pedirStream, me, salir, obtenerListas, subirListas } from './api.js';
 import { exportarPng } from './exportar.js';
 
 const $ = id => document.getElementById(id);
@@ -102,10 +103,39 @@ async function pintarCuenta() {
          <button class="cuenta-btn" id="btnSalir" type="button">Salir</button>`
       : `<a class="cuenta-google" href="/login">${LOGO_G}<span>Entrar con Google</span></a>`;
     const btn = cont.querySelector('#btnSalir');
-    if (btn) btn.onclick = async () => { await salir(); pintarCuenta(); };
+    if (btn) btn.onclick = async () => { sesionConListas = false; await salir(); pintarCuenta(); };
+    if (u.autenticado && u.listas) await sincronizarListas();
   } catch {
     cont.hidden = true;
   }
+}
+
+// ---- Sincronización de listas con la cuenta ----
+let sesionConListas = false;   // true = hay sesión y BD: los cambios se suben solos
+let tempSubida = null;
+
+// Cada cambio en las listas (con sesión) se sube con un pequeño debounce.
+notificarCambios(() => {
+  if (!sesionConListas) return;
+  clearTimeout(tempSubida);
+  tempSubida = setTimeout(() => subirListas().catch(() => {}), 800);
+});
+
+// Al iniciar sesión: si la cuenta está vacía y aquí hay datos, se suben (primera vez);
+// si la cuenta tiene datos, mandan ellos y se repinta todo.
+async function sincronizarListas() {
+  try {
+    const nube = await obtenerListas();
+    const nubeVacia = !(nube.favoritos?.length || nube.descartados?.length || nube.pendientes?.length);
+    if (nubeVacia && hayDatosLocales()) {
+      await subirListas();
+    } else if (!nubeVacia) {
+      cargarListas(nube);
+      pintarChips(); actualizarContadorDesc(); actualizarContadorPend();
+      inicializarFiltros(); pintarRecomendaciones();
+    }
+    sesionConListas = true;
+  } catch { /* sin sincronización: la app sigue funcionando en local */ }
 }
 
 // ---- Indicador de estado del modelo ----
