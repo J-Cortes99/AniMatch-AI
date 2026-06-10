@@ -1,5 +1,7 @@
 using System.ClientModel;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
@@ -68,6 +70,37 @@ static RateLimitPartition<string> PorDia(string grupo, int porDia) =>
         "dia:" + grupo,
         _ => new FixedWindowRateLimiterOptions { PermitLimit = porDia, Window = TimeSpan.FromDays(1) });
 
+// --- Cuentas: inicio de sesión con Google (opcional) ---
+// Credenciales por entorno: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (o Google__ClientId /
+// Google__ClientSecret). Sin ellas la app funciona igual, solo que sin login.
+if (string.IsNullOrWhiteSpace(builder.Configuration["Google:ClientId"]))
+    builder.Configuration["Google:ClientId"] = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+if (string.IsNullOrWhiteSpace(builder.Configuration["Google:ClientSecret"]))
+    builder.Configuration["Google:ClientSecret"] = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+var googleId = builder.Configuration["Google:ClientId"];
+var googleSecreto = builder.Configuration["Google:ClientSecret"];
+var conGoogle = !string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecreto);
+
+var auth = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
+auth.AddCookie(o =>
+{
+    o.Cookie.Name = "animatch_sesion";
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Lax;
+    o.ExpireTimeSpan = TimeSpan.FromDays(30);
+    o.SlidingExpiration = true;
+    // Somos una API + página estática: ante un 401 no redirigimos a ninguna página de login.
+    o.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+});
+if (conGoogle)
+    auth.AddGoogle(o =>
+    {
+        o.ClientId = googleId!;
+        o.ClientSecret = googleSecreto!;
+        o.ClaimActions.MapJsonKey("picture", "picture");   // avatar para la cabecera
+    });
+builder.Services.AddAuthorization();
+
 // Detrás del proxy de un hosting (DetrasDeProxy=true), la IP real del cliente llega en
 // X-Forwarded-For. ForwardLimit=1 procesa solo la última entrada (la que añade el proxy
 // de confianza), ignorando valores falsificados por el cliente. En local queda apagado:
@@ -113,9 +146,12 @@ if (builder.Configuration.GetValue("DetrasDeProxy", false))
 
 app.UseDefaultFiles();   // sirve wwwroot/index.html en "/"
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 
 // --- Endpoints (cada grupo en su archivo, en Endpoints/) ---
+app.MapCuenta(conGoogle);
 app.MapRecomendaciones();
 app.MapSalud();
 app.MapTraduccion();

@@ -68,6 +68,20 @@ body::after{
 }
 @keyframes latido{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.3); } }
 
+/* ---- Cuenta (Google) ---- */
+.cuenta{ position:absolute; top:.4rem; right:1.2rem; display:flex; align-items:center; gap:.55rem; z-index:5; }
+.cuenta-foto{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--borde); display:block; }
+.cuenta-nombre{
+  font-family:"Anton",sans-serif; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--papel-2); max-width:14ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cuenta-btn{
+  background:var(--tinta-2); border:1.5px solid var(--borde); color:var(--papel-2);
+  padding:.35rem .7rem; font-family:"Anton",sans-serif; font-size:.68rem; letter-spacing:.08em;
+  text-transform:uppercase; border-radius:2px; cursor:pointer; text-decoration:none; transition:all .15s;
+}
+.cuenta-btn:hover{ border-color:var(--bermellon); color:var(--bermellon); }
+
 /* ---- Entrada / favoritos ---- */
 .seccion-label{
   display:block; font-family:"Anton",sans-serif; letter-spacing:.2em; text-transform:uppercase;

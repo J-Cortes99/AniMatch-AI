@@ -5,7 +5,7 @@ import {
   guardarFavoritos, guardarDescartados, guardarPendientes, guardarFiltros,
   agregarFavorito, alternarPendiente, estaPendiente, yaEsFavorito, esPermitido,
 } from './estado.js';
-import { salud, buscar, traducir, pedirStream } from './api.js';
+import { salud, buscar, traducir, pedirStream, me, salir } from './api.js';
 import { exportarPng } from './exportar.js';
 
 const $ = id => document.getElementById(id);
@@ -79,7 +79,28 @@ $('sugerencias').onclick = e => {
 };
 document.addEventListener('click', e => { if (!e.target.closest('.campo')) cerrarSugerencias(); });
 
-// ---- Indicador de estado de Ollama ----
+// ---- Cuenta (Google) ----
+// Pinta la esquina de sesión: botón de entrar, o avatar + nombre + salir.
+// Si el servidor no tiene credenciales de Google, no se muestra nada.
+async function pintarCuenta() {
+  const cont = $('cuenta');
+  try {
+    const u = await me();
+    if (!u.disponible) { cont.hidden = true; return; }
+    cont.hidden = false;
+    cont.innerHTML = u.autenticado
+      ? `${u.foto ? `<img class="cuenta-foto" src="${esc(u.foto)}" alt="" referrerpolicy="no-referrer">` : ''}
+         <span class="cuenta-nombre">${esc(u.nombre)}</span>
+         <button class="cuenta-btn" id="btnSalir" type="button">Salir</button>`
+      : `<a class="cuenta-btn" href="/login">Entrar con Google</a>`;
+    const btn = cont.querySelector('#btnSalir');
+    if (btn) btn.onclick = async () => { await salir(); pintarCuenta(); };
+  } catch {
+    cont.hidden = true;
+  }
+}
+
+// ---- Indicador de estado del modelo ----
 async function comprobarEstado() {
   const punto = $('estado').querySelector('.punto');
   const texto = $('estadoTexto');
@@ -494,3 +515,4 @@ inicializarFiltros();
 actualizarContadorDesc();
 actualizarContadorPend();
 comprobarEstado();
+pintarCuenta();

@@ -20,6 +20,16 @@ export async function salud() {
   return (await fetch('/api/health')).json();
 }
 
+// GET /api/me → sesión actual: {autenticado, disponible, nombre?, foto?}.
+export async function me() {
+  return (await fetch('/api/me')).json();
+}
+
+// POST /api/logout → cierra la sesión (borra la cookie).
+export async function salir() {
+  await fetch('/api/logout', { method: 'POST' });
+}
+
 // GET /api/buscar?q= → lista de sugerencias [{titulo, anio, imagen}].
 export async function buscar(q) {
   const res = await fetch('/api/buscar?q=' + encodeURIComponent(q));
