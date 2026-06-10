@@ -7,45 +7,57 @@ namespace AnimeRecommender.Endpoints;
 
 public static class SaludEndpoints
 {
-    // GET /api/health — ¿está Ollama levantado y el modelo descargado?
+    // GET /api/health — estado del modelo. Con proveedor en la nube no hacemos llamadas
+    // remotas (sería gastar cuota en comprobar); la API key ya se validó al arrancar.
+    // Con Ollama local sí comprobamos que el servidor responde y el modelo está descargado.
     public static void MapSalud(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/health", async (IHttpClientFactory factory, IOptions<OllamaOptions> oOpts, CancellationToken ct) =>
+        app.MapGet("/api/health", async (IHttpClientFactory factory, IOptions<ModeloOptions> mOpts, CancellationToken ct) =>
         {
-            var ollama = oOpts.Value;
+            var modelo = mOpts.Value;
+
+            if (!modelo.EsLocal)
+                return Results.Ok(new
+                {
+                    ok = true,
+                    modelo = modelo.Nombre,
+                    modeloDisponible = true,
+                    detalle = $"Modelo en la nube · {modelo.Nombre}",
+                });
+
             var client = factory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(3);
             try
             {
                 var tags = await client.GetFromJsonAsync<JsonElement>(
-                    $"{ollama.Endpoint.TrimEnd('/')}/api/tags", ct);
+                    $"{modelo.Endpoint.TrimEnd('/')}/api/tags", ct);
 
                 var modelos = tags.TryGetProperty("models", out var arr) && arr.ValueKind == JsonValueKind.Array
                     ? arr.EnumerateArray().Select(m => m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "")
                     : Enumerable.Empty<string>();
 
                 var disponible = modelos.Any(n =>
-                    n.Equals(ollama.Model, StringComparison.OrdinalIgnoreCase) ||
-                    n.StartsWith(ollama.Model + ":", StringComparison.OrdinalIgnoreCase));
+                    n.Equals(modelo.Nombre, StringComparison.OrdinalIgnoreCase) ||
+                    n.StartsWith(modelo.Nombre + ":", StringComparison.OrdinalIgnoreCase));
 
                 return Results.Ok(new
                 {
                     ok = true,
-                    modelo = ollama.Model,
+                    modelo = modelo.Nombre,
                     modeloDisponible = disponible,
                     detalle = disponible
-                        ? $"Ollama conectado · {ollama.Model}"
-                        : $"Ollama conectado, pero el modelo '{ollama.Model}' no está descargado (ollama pull {ollama.Model})."
+                        ? $"Modelo local conectado · {modelo.Nombre}"
+                        : $"Ollama conectado, pero el modelo '{modelo.Nombre}' no está descargado (ollama pull {modelo.Nombre}).",
                 });
             }
-            catch (Exception ex)
+            catch
             {
                 return Results.Ok(new
                 {
                     ok = false,
-                    modelo = ollama.Model,
+                    modelo = modelo.Nombre,
                     modeloDisponible = false,
-                    detalle = $"No se pudo contactar con Ollama en {ollama.Endpoint}. ¿Está 'ollama serve' en marcha? ({ex.Message})"
+                    detalle = "No se pudo contactar con el modelo local. ¿Está 'ollama serve' en marcha?",
                 });
             }
         });

@@ -8,8 +8,8 @@ using AnimeRecommender.Options;
 
 namespace AnimeRecommender.Services;
 
-// Construye el prompt y pide recomendaciones al modelo local, devolviéndolas en streaming.
-public sealed class RecomendadorService(IChatClient chat, IOptions<OllamaOptions> opciones)
+// Construye el prompt y pide recomendaciones al modelo, devolviéndolas en streaming.
+public sealed class RecomendadorService(IChatClient chat, IOptions<ModeloOptions> opciones)
 {
     private readonly TimeSpan _timeout = opciones.Value.Timeout;
 
