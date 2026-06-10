@@ -19,16 +19,18 @@ public static class RecomendacionesEndpoints
             PeticionRecomendacion peticion,
             RecomendadorService recomendador,
             JikanService jikan,
-            IOptions<OllamaOptions> oOpts,
+            IOptions<ModeloOptions> mOpts,
             IOptions<JikanOptions> jOpts,
+            ILoggerFactory loggerFactory,
             HttpContext http,
             CancellationToken ct) =>
         {
-            var ollama = oOpts.Value;
+            var modelo = mOpts.Value;
             await using var e = recomendador.RecomendarStreamAsync(peticion, ct).GetAsyncEnumerator(ct);
 
             // El primer MoveNext dispara la llamada al modelo: aquí cazamos los fallos
-            // (Ollama caído, timeout) ANTES de escribir el cuerpo, para devolver un código claro.
+            // (proveedor caído, timeout) ANTES de escribir el cuerpo, para devolver un código
+            // claro. El detalle técnico va al log; al cliente, un mensaje genérico.
             bool hay;
             try
             {
@@ -42,13 +44,15 @@ public static class RecomendacionesEndpoints
             catch (OperationCanceledException)
             {
                 await Problema(http, StatusCodes.Status504GatewayTimeout, "El modelo tardó demasiado",
-                    $"La generación superó el límite de {ollama.Timeout.TotalSeconds:0} s. Prueba con menos animes o un modelo más ligero.");
+                    $"La generación superó el límite de {modelo.Timeout.TotalSeconds:0} s. Prueba a pedir menos animes.");
                 return;
             }
             catch (Exception ex)
             {
+                loggerFactory.CreateLogger("Recomendaciones")
+                    .LogError(ex, "El modelo ({Proveedor}/{Nombre}) no respondió", modelo.Proveedor, modelo.Nombre);
                 await Problema(http, StatusCodes.Status503ServiceUnavailable, "El recomendador no está disponible",
-                    $"No se pudo contactar con el modelo en {ollama.Endpoint}. ¿Está 'ollama serve' en marcha y el modelo '{ollama.Model}' descargado? ({ex.Message})");
+                    "No se pudo generar la recomendación. Inténtalo de nuevo en un momento.");
                 return;
             }
 
@@ -78,7 +82,7 @@ public static class RecomendacionesEndpoints
                 try { hay = await e.MoveNextAsync(); }
                 catch { break; }   // error o timeout a mitad: cortamos; el cliente conserva lo recibido
             }
-        });
+        }).RequireRateLimiting("recomendaciones");
     }
 
     // Escribe un ProblemDetails (mismo formato que Results.Problem) en la respuesta ya iniciada.
