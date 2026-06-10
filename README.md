@@ -1,8 +1,9 @@
 # 🎌 AniMatch
 
-**Recomendador de anime con IA 100% local.** Le dices qué animes te gustan y un modelo de
-lenguaje que corre en **tu propia GPU** te sugiere qué ver a continuación —con carátulas, nota,
-sinopsis y tráiler de MyAnimeList—, todo sin nube, sin coste y sin enviar tus datos a terceros.
+**Recomendador de anime con IA.** Le dices qué animes te gustan y un modelo de lenguaje te
+sugiere qué ver a continuación —con carátulas, nota, sinopsis y tráiler de MyAnimeList—.
+El proveedor del modelo es configurable: **Gemini** en la nube para desplegarlo multiusuario,
+u **Ollama** en tu propia GPU para desarrollo o uso 100% local.
 
 <!-- Sube una captura a docs/ y descomenta esta línea: -->
 <!-- ![AniMatch](docs/captura.png) -->
@@ -11,9 +12,12 @@ sinopsis y tráiler de MyAnimeList—, todo sin nube, sin coste y sin enviar tus
 
 ## ✨ Características
 
-- 🧠 **Recomendaciones por IA local** vía [Ollama](https://ollama.com) (gemma3) — sin API de pago.
-  Hoy corre **en local**, pero la arquitectura (abstracción `IChatClient`) está preparada para
-  conmutar a un **servicio de IA en la nube** más adelante, tocando una sola línea.
+- 🧠 **Recomendaciones por IA con proveedor conmutable** (abstracción `IChatClient`):
+  **Gemini** (endpoint OpenAI-compatible) para producción, **[Ollama](https://ollama.com)**
+  (gemma3) en local para desarrollo — se elige en configuración, sin tocar código.
+- 🛡️ **Pensado para exponerlo al público**: rate limiting por IP + techo diario global en los
+  endpoints que llaman al modelo, traducción acotada a sinopsis reales de MAL (por id, nunca
+  texto libre del cliente) y errores genéricos hacia el cliente (el detalle, al log).
 - ⚡ **Streaming en directo**: las tarjetas van apareciendo según el modelo las genera (NDJSON).
 - 🖼️ **Fichas enriquecidas con MyAnimeList** (API pública [Jikan](https://jikan.moe)): carátula,
   nota, año, episodios, estudio, sinopsis y tráiler de YouTube.
@@ -22,7 +26,7 @@ sinopsis y tráiler de MyAnimeList—, todo sin nube, sin coste y sin enviar tus
   "Attack on Titan") y sus temporadas/secuelas.
 - 🔎 **Autocompletado** de favoritos con títulos reales de MAL.
 - ⭐ **Listas personales** persistentes: favoritos, **pendientes** (watchlist) y descartados.
-- 🌐 **Traducción de la sinopsis** al español con el propio modelo local, bajo demanda.
+- 🌐 **Traducción de la sinopsis** al español con el propio modelo, bajo demanda y cacheada.
 - 🖌️ **Exportar la tanda como "página de manga"** en PNG para compartir.
 - 🎨 **Interfaz con identidad propia**: estética editorial manga (tinta + bermellón, trama de
   semitono, tipografía de impacto), responsive y con micro-animaciones.
@@ -32,14 +36,16 @@ sinopsis y tráiler de MyAnimeList—, todo sin nube, sin coste y sin enviar tus
 | Capa | Tecnología |
 |------|-----------|
 | Backend | ASP.NET Core **Minimal API** (.NET 10) |
-| IA | **Ollama** + `gemma3:12b`, a través de `Microsoft.Extensions.AI` (cambiar de proveedor es **una línea**) |
+| IA | `Microsoft.Extensions.AI` (`IChatClient`) — **Gemini** (`gemini-2.5-flash-lite`) en producción, **Ollama** + `gemma3:12b` en desarrollo |
 | Datos | API pública **Jikan** (MyAnimeList) |
 | Frontend | Una sola página, **HTML/CSS/JS vanilla** (sin frameworks) |
 
 ## 🚀 Cómo ejecutarlo
 
-**Requisitos:** [.NET 10 SDK](https://dotnet.microsoft.com/) y [Ollama](https://ollama.com).
-Funciona en cualquier GPU (o CPU, más lento).
+**Requisitos:** [.NET 10 SDK](https://dotnet.microsoft.com/), y para el modo de desarrollo
+[Ollama](https://ollama.com) (funciona en cualquier GPU; en CPU, más lento).
+
+**Desarrollo (modelo local, sin API key)** — `appsettings.Development.json` ya selecciona Ollama:
 
 ```bash
 # 1) Arranca Ollama y descarga el modelo
@@ -50,28 +56,39 @@ ollama pull gemma3:12b
 dotnet run
 ```
 
+**Producción (Gemini en la nube)** — `appsettings.json` ya apunta al endpoint
+OpenAI-compatible de Gemini; solo falta la API key
+(de [Google AI Studio](https://aistudio.google.com/apikey)), por variable de entorno:
+
+```bash
+export GEMINI_API_KEY="tu-clave"        # nunca en appsettings versionado
+export ASPNETCORE_ENVIRONMENT=Production
+dotnet run --no-launch-profile
+```
+
 Abre **http://localhost:5080** y añade un par de animes que te gusten.
 
-El endpoint, el modelo, el timeout y si usar o no Jikan se configuran en
-[`appsettings.json`](appsettings.json) — sin recompilar.
+El proveedor/modelo, el timeout, los límites de uso (por IP y diarios), si usar o no Jikan
+y el modo proxy (`DetrasDeProxy`) se configuran en [`appsettings.json`](appsettings.json)
+— sin recompilar.
 
 ## 🧱 Cómo funciona
 
 1. El navegador envía tus favoritos (+ descartados/pendientes) al backend.
-2. `RecomendadorAnime` construye un prompt y pide recomendaciones al modelo local, que
+2. `RecomendadorService` construye un prompt y pide recomendaciones al modelo, que
    **devuelve en streaming**; un parser tolerante extrae cada anime en cuanto se completa.
 3. Cada recomendación se **enriquece contra MyAnimeList** (carátula, ficha) y se filtran
    alucinaciones y duplicados de serie.
 4. El frontend va pintando las tarjetas a medida que llegan (NDJSON) y guarda tus listas en
    `localStorage`.
 
-> La abstracción `IChatClient` de `Microsoft.Extensions.AI` permite cambiar el LLM local por
-> uno en la nube (OpenAI-compatible) tocando una sola línea, lo que facilita escalarlo.
+> La abstracción `IChatClient` de `Microsoft.Extensions.AI` es la que permite que Gemini y
+> Ollama sean intercambiables por configuración: el resto del código no sabe cuál hay detrás.
 
 ## 🗺️ Roadmap
 
-- ☁️ **Servicio de IA en la nube**: dejar el proveedor del LLM configurable (local con Ollama
-  **o** un endpoint OpenAI-compatible) para poder desplegarlo multiusuario sin GPU propia.
+- 🐳 **Dockerfile + despliegue** en un hosting (puerto configurable vía `PORT`).
+- 💾 Caché persistente de traducciones (cada sinopsis se paga una sola vez).
 - 👤 Cuentas de usuario + base de datos para sincronizar listas entre dispositivos.
 
 ## 📄 Licencia
