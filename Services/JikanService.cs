@@ -66,6 +66,7 @@ public sealed class JikanService
 
         return anime with
         {
+            MalId = ficha.MalId,
             Titulo = ficha.TitleEnglish ?? ficha.Title ?? anime.Titulo,
             Imagen = ficha.Imagen,
             Url = ficha.Url,
@@ -121,6 +122,52 @@ public sealed class JikanService
 
             _cache.Set(clave, sugerencias, TimeSpan.FromHours(6));
             return sugerencias;
+        }
+        finally
+        {
+            _puerta.Release();
+        }
+    }
+
+    // Sinopsis (en inglés, ya limpia) de un anime por su id de MAL. La usa la traducción:
+    // así el servidor decide qué texto va al modelo, no el cliente. Null si el anime no
+    // existe o no tiene sinopsis.
+    public async Task<string?> ObtenerSinopsisAsync(int malId, CancellationToken ct)
+    {
+        var clave = "sinopsis:" + malId;
+        if (_cache.TryGetValue(clave, out string? cacheada))
+            return string.IsNullOrEmpty(cacheada) ? null : cacheada;
+
+        await _puerta.WaitAsync(ct);
+        try
+        {
+            if (_cache.TryGetValue(clave, out cacheada))
+                return string.IsNullOrEmpty(cacheada) ? null : cacheada;
+
+            var espera = _ultimaLlamada + Intervalo - DateTime.UtcNow;
+            if (espera > TimeSpan.Zero) await Task.Delay(espera, ct);
+
+            var client = _factory.CreateClient("jikan");
+            using var resp = await client.GetAsync($"anime/{malId}", ct);
+            _ultimaLlamada = DateTime.UtcNow;
+
+            // 404 = id que no existe: lo cacheamos (vacío) para no repetir la búsqueda.
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _cache.Set(clave, "", TimeSpan.FromHours(24));
+                return null;
+            }
+            if (!resp.IsSuccessStatusCode)
+                return null;   // 429/5xx: no cacheamos; el siguiente intento podrá reintentar
+
+            // Jikan a veces devuelve 200 con un error envuelto en el cuerpo (sin "data");
+            // eso es transitorio: no lo cacheamos, para poder reintentar.
+            var datos = await resp.Content.ReadFromJsonAsync<RespuestaUna>(JsonOpts, ct);
+            if (datos?.Data is null) return null;
+
+            var sinopsis = LimpiarSinopsis(datos.Data.Synopsis) ?? "";
+            _cache.Set(clave, sinopsis, TimeSpan.FromHours(24));
+            return sinopsis.Length == 0 ? null : sinopsis;
         }
         finally
         {
@@ -238,9 +285,11 @@ public sealed class JikanService
 
     // ---- DTOs de la respuesta de Jikan (/v4/anime) ----
     private sealed class Respuesta { public List<Ficha>? Data { get; set; } }
+    private sealed class RespuestaUna { public Ficha? Data { get; set; } }   // /v4/anime/{id}
 
     private sealed class Ficha
     {
+        public int? MalId { get; set; }
         public string? Url { get; set; }
         public string? Title { get; set; }
         public string? TitleEnglish { get; set; }

@@ -5,20 +5,25 @@ using AnimeRecommender.Options;
 
 namespace AnimeRecommender.Services;
 
-// Traduce un texto al español con el modelo local. Cachea el resultado en memoria.
+// Traduce al español la sinopsis de un anime, identificado por su id de MAL. El texto
+// lo obtiene el propio servidor (vía JikanService), nunca el cliente: así el endpoint
+// no puede usarse como traductor de texto arbitrario. Cachea por id en memoria.
+// Devuelve null si el anime no existe o no tiene sinopsis.
 // Lanza OperationCanceledException si se cancela o se agota el timeout (el endpoint lo mapea).
-public sealed class TraduccionService(IChatClient chat, IMemoryCache cache, IOptions<OllamaOptions> opciones)
+public sealed class TraduccionService(
+    IChatClient chat, JikanService jikan, IMemoryCache cache, IOptions<ModeloOptions> opciones)
 {
     private readonly TimeSpan _timeout = opciones.Value.Timeout;
 
-    public async Task<string> TraducirAsync(string texto, CancellationToken ct)
+    public async Task<string?> TraducirSinopsisAsync(int malId, CancellationToken ct)
     {
-        texto = (texto ?? "").Trim();
-        if (texto.Length == 0) return "";
-
-        var clave = "trad:" + texto.GetHashCode();
+        var clave = "trad:" + malId;
         if (cache.TryGetValue(clave, out string? cacheado))
-            return cacheado!;
+            return cacheado;
+
+        var sinopsis = await jikan.ObtenerSinopsisAsync(malId, ct);
+        if (string.IsNullOrWhiteSpace(sinopsis))
+            return null;
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(_timeout);
@@ -27,12 +32,14 @@ public sealed class TraduccionService(IChatClient chat, IMemoryCache cache, IOpt
             Traduce al español, de forma natural y fluida, el siguiente texto.
             Devuelve ÚNICAMENTE la traducción, sin comillas ni notas ni texto adicional.
 
-            {{texto}}
+            {{sinopsis}}
             """;
 
         var r = await chat.GetResponseAsync(prompt, cancellationToken: cts.Token);
         var traduccion = (r.Text ?? "").Trim();
-        cache.Set(clave, traduccion, TimeSpan.FromDays(1));
+        if (traduccion.Length == 0) return null;   // respuesta vacía: no la cacheamos
+
+        cache.Set(clave, traduccion, TimeSpan.FromDays(7));
         return traduccion;
     }
 }

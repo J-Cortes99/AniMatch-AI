@@ -12,7 +12,7 @@ function serializarFiltros() {
   };
 }
 
-// GET /api/health → objeto de estado de Ollama.
+// GET /api/health → objeto de estado del modelo.
 export async function salud() {
   return (await fetch('/api/health')).json();
 }
@@ -24,11 +24,12 @@ export async function buscar(q) {
   return res.json();
 }
 
-// POST /api/traducir → texto traducido al español. Lanza si el backend devuelve error.
-export async function traducir(texto) {
+// POST /api/traducir → sinopsis del anime (por su id de MAL) traducida al español.
+// Lanza si el backend devuelve error.
+export async function traducir(malId) {
   const res = await fetch('/api/traducir', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto })
+    body: JSON.stringify({ malId })
   });
   if (!res.ok) throw new Error('fallo de traducción');
   const { traduccion } = await res.json();

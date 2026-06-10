@@ -82,14 +82,14 @@ document.addEventListener('click', e => { if (!e.target.closest('.campo')) cerra
 async function comprobarEstado() {
   const punto = $('estado').querySelector('.punto');
   const texto = $('estadoTexto');
-  punto.style.background = '#5a6072'; texto.textContent = 'Comprobando Ollama…';
+  punto.style.background = '#5a6072'; texto.textContent = 'Comprobando el modelo…';
   try {
     const s = await salud();
     punto.style.background = !s.ok ? '#ec3b2b' : (s.modeloDisponible ? '#3ec06f' : '#f5a623');
     texto.textContent = s.detalle;
   } catch {
     punto.style.background = '#ec3b2b';
-    texto.textContent = 'No se pudo comprobar el estado de Ollama.';
+    texto.textContent = 'No se pudo comprobar el estado del modelo.';
   }
 }
 $('estado').onclick = comprobarEstado;
@@ -402,7 +402,11 @@ function sinopsisBloque(a) {
     control = `<button class="link-sinopsis" data-accion="traduccion" type="button">Ver traducción</button>`;
   } else {
     cuerpo = esc(a.sinopsis);
-    control = `<button class="btn-traducir" data-accion="traducir" type="button">Traducir al español</button>`;
+    // La traducción va por id de MAL; fichas antiguas sin malId (guardadas antes
+    // de este campo) no la ofrecen.
+    control = a.malId
+      ? `<button class="btn-traducir" data-accion="traducir" type="button">Traducir al español</button>`
+      : '';
   }
   return `<div class="det-bloque" id="bloqueSinopsis"><span class="et">Sinopsis</span><p>${cuerpo}</p>${control}</div>`;
 }
@@ -459,12 +463,12 @@ $('detalleBody').onclick = async e => {
   if (acc.dataset.accion === 'original')   { a.mostrarTraduccion = false; refrescarSinopsis(); return; }
   if (acc.dataset.accion === 'traduccion') { a.mostrarTraduccion = true;  refrescarSinopsis(); return; }
 
-  // Traducir la sinopsis al español con el modelo local (y cachearla en el objeto).
+  // Traducir la sinopsis al español (el backend la resuelve por el id de MAL).
   if (acc.dataset.accion === 'traducir') {
-    if (!a.sinopsis) return;
+    if (!a.malId) return;
     acc.disabled = true; acc.textContent = 'Traduciendo…';
     try {
-      a.sinopsisEs = ((await traducir(a.sinopsis)) || '').trim() || a.sinopsis;
+      a.sinopsisEs = ((await traducir(a.malId)) || '').trim() || a.sinopsis;
       a.mostrarTraduccion = true;
       refrescarSinopsis();
     } catch {

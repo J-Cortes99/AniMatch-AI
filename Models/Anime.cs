@@ -7,4 +7,5 @@ public record Anime(
     string Titulo, string Motivo, string[] Generos,
     string? Imagen = null, string? Url = null,
     double? Nota = null, int? Anio = null, int? Episodios = null,
-    string? Sinopsis = null, string? TrailerId = null, string? Estudio = null);
+    string? Sinopsis = null, string? TrailerId = null, string? Estudio = null,
+    int? MalId = null);
