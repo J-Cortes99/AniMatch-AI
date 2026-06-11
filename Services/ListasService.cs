@@ -1,46 +1,16 @@
-using Npgsql;
-
 namespace AnimeRecommender.Services;
 
 // Listas por usuario en Postgres: una fila por usuario con las listas como JSONB
-// (mismo formato que guarda el navegador en localStorage). Si no hay cadena de
-// conexión configurada, Disponible=false y la app funciona solo con localStorage.
-public sealed class ListasService : IAsyncDisposable
+// (mismo formato que guarda el navegador en localStorage). Sin base de datos
+// configurada, Disponible=false y la app funciona solo con localStorage.
+public sealed class ListasService(BaseDatos bd)
 {
-    private readonly NpgsqlDataSource? _bd;
-
-    public bool Disponible => _bd is not null;
-
-    public ListasService(IConfiguration cfg)
-    {
-        var cadena = cfg.GetConnectionString("AniMatch");
-        _bd = string.IsNullOrWhiteSpace(cadena) ? null : NpgsqlDataSource.Create(cadena);
-    }
-
-    // Crea la tabla si no existe. Se llama una vez al arrancar.
-    public async Task InicializarAsync(CancellationToken ct = default)
-    {
-        if (_bd is null) return;
-        await using var cmd = _bd.CreateCommand("""
-            CREATE TABLE IF NOT EXISTS usuarios(
-              id          TEXT PRIMARY KEY,            -- 'sub' de Google
-              nombre      TEXT NOT NULL DEFAULT '',
-              email       TEXT NOT NULL DEFAULT '',
-              creado      TIMESTAMPTZ NOT NULL DEFAULT now(),
-              actualizado TIMESTAMPTZ NOT NULL DEFAULT now(),
-              favoritos   JSONB NOT NULL DEFAULT '[]',
-              descartados JSONB NOT NULL DEFAULT '[]',
-              pendientes  JSONB NOT NULL DEFAULT '[]',
-              filtros     JSONB NOT NULL DEFAULT '{}'
-            )
-            """);
-        await cmd.ExecuteNonQueryAsync(ct);
-    }
+    public bool Disponible => bd.Disponible;
 
     // Las listas del usuario como JSON ya montado por Postgres, o null si nunca guardó.
     public async Task<string?> ObtenerAsync(string usuarioId, CancellationToken ct)
     {
-        await using var cmd = _bd!.CreateCommand("""
+        await using var cmd = bd.Fuente.CreateCommand("""
             SELECT json_build_object(
                      'favoritos', favoritos, 'descartados', descartados,
                      'pendientes', pendientes, 'filtros', filtros)::text
@@ -57,7 +27,7 @@ public sealed class ListasService : IAsyncDisposable
         string favoritos, string descartados, string pendientes, string filtros,
         CancellationToken ct)
     {
-        await using var cmd = _bd!.CreateCommand("""
+        await using var cmd = bd.Fuente.CreateCommand("""
             INSERT INTO usuarios(id, nombre, email, favoritos, descartados, pendientes, filtros)
             VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb)
             ON CONFLICT (id) DO UPDATE SET
@@ -75,6 +45,4 @@ public sealed class ListasService : IAsyncDisposable
         cmd.Parameters.AddWithValue(filtros);
         await cmd.ExecuteNonQueryAsync(ct);
     }
-
-    public ValueTask DisposeAsync() => _bd?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

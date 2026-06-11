@@ -34,7 +34,8 @@ Docker en una VM ARM de Oracle Cloud, con HTTPS automático (Caddy) y Gemini com
   usuario). El primer login migra automáticamente lo que tuvieras en localStorage; sin
   sesión, todo sigue funcionando en local.
 - ⭐ **Listas personales** persistentes: favoritos, **pendientes** (watchlist) y descartados.
-- 🌐 **Traducción de la sinopsis** al español con el propio modelo, bajo demanda y cacheada.
+- 🌐 **Traducción de la sinopsis** al español con el propio modelo, bajo demanda y con caché
+  persistente en Postgres: cada sinopsis se traduce (y se paga) una sola vez en la vida de la app.
 - 🖌️ **Exportar la tanda como "página de manga"** en PNG para compartir.
 - 🎨 **Interfaz con identidad propia**: estética editorial manga (tinta + bermellón, trama de
   semitono, tipografía de impacto), responsive y con micro-animaciones.
@@ -128,7 +129,10 @@ Actions, y desplegar sin CI con `git pull && docker compose build && docker comp
 
 ## 🗺️ Roadmap
 
-- 💾 Caché persistente de traducciones (cada sinopsis se paga una sola vez).
+- 🧪 Tests del núcleo (parser de streaming, saneo de peticiones, filtros de Jikan) en el CI.
+- 💾 Backup automático del Postgres de la VM.
+- 📲 Open Graph + manifest PWA (vista previa al compartir, instalable en el móvil).
+- 📊 Observabilidad mínima (uso y coste por día).
 
 ## 📄 Licencia
 

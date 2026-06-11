@@ -176,6 +176,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("AniMatc
     builder.Configuration["ConnectionStrings:AniMatch"] = Environment.GetEnvironmentVariable("ANIMATCH_DB");
 
 // --- Servicios de la aplicación ---
+builder.Services.AddSingleton<BaseDatos>();
 builder.Services.AddSingleton<JikanService>();
 builder.Services.AddSingleton<RecomendadorService>();
 builder.Services.AddSingleton<TraduccionService>();
@@ -193,9 +194,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
-// Crea la tabla de usuarios si hay base de datos configurada.
+// Crea las tablas (usuarios, traducciones) si hay base de datos configurada.
+await app.Services.GetRequiredService<BaseDatos>().InicializarAsync();
 var listas = app.Services.GetRequiredService<ListasService>();
-await listas.InicializarAsync();
 
 // --- Endpoints (cada grupo en su archivo, en Endpoints/) ---
 app.MapCuenta(conGoogle, listas.Disponible);
