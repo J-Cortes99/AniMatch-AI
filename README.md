@@ -105,7 +105,11 @@ cp .env.example .env && nano .env     # rellena Gemini, Google y la BD
 docker compose up -d --build
 ```
 
-Para actualizar: `git pull && docker compose build && docker compose up -d`.
+**CI/CD**: cada push a `main` (salvo cambios solo de documentación) dispara
+[`deploy.yml`](.github/workflows/deploy.yml) — buildx construye la imagen ARM64, la sube a
+GHCR y un paso SSH actualiza la VM (`compose pull && up -d` + health check). Secretos del
+repo: `VM_HOST`, `VM_USER`, `VM_SSH_KEY`. También se puede lanzar a mano desde la pestaña
+Actions, y desplegar sin CI con `git pull && docker compose build && docker compose up -d`.
 
 ## 🧱 Cómo funciona
 
@@ -123,7 +127,6 @@ Para actualizar: `git pull && docker compose build && docker compose up -d`.
 
 ## 🗺️ Roadmap
 
-- 🔁 **CI/CD**: push a `main` → imagen → deploy automático en la VM (como HunterVault).
 - 💾 Caché persistente de traducciones (cada sinopsis se paga una sola vez).
 
 ## 📄 Licencia
