@@ -170,5 +170,8 @@ app.MapBusqueda();
 app.MapImagen();
 app.MapListas();
 
-var serverUrl = builder.Configuration["ServerUrl"] ?? "http://localhost:5080";
-app.Run(serverUrl);
+// Con ServerUrl configurado (desarrollo local) se escucha ahí; sin él (contenedor),
+// mandan ASPNETCORE_URLS o el puerto por defecto de Kestrel.
+var serverUrl = builder.Configuration["ServerUrl"];
+if (string.IsNullOrWhiteSpace(serverUrl)) app.Run();
+else app.Run(serverUrl);

@@ -23,6 +23,7 @@ Thumbs.db
 # Secretos locales (por si algún día añades claves de API en la nube)
 appsettings.*.local.json
 *.secrets.json
+.env
 
 # Notas internas de Claude Code (no forman parte del proyecto)
 CLAUDE.md

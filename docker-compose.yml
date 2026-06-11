@@ -1,0 +1,25 @@
+# AniMatch en la VM, junto a HunterVault: se engancha a la red de su compose
+# (donde viven huntervault-db y Caddy). No publica puertos: solo se llega a él
+# a través de Caddy, que le hace de HTTPS y le pasa X-Forwarded-For/Proto.
+services:
+  animatch:
+    image: animatch:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: animatch
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DetrasDeProxy: "true"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      ConnectionStrings__AniMatch: "Host=huntervault-db;Port=5432;Database=animatch;Username=animatch;Password=${ANIMATCH_DB_PASSWORD}"
+    networks:
+      - huntervault-net
+
+networks:
+  huntervault-net:
+    external: true
+    name: huntervault_huntervault-net

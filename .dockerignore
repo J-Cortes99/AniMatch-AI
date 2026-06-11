@@ -1,0 +1,10 @@
+bin/
+obj/
+.git/
+.github/
+.claude/
+.gitignore
+README.md
+docker-compose.yml
+.env
+.env.example
