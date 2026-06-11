@@ -3,7 +3,9 @@
 # a través de Caddy, que le hace de HTTPS y le pasa X-Forwarded-For/Proto.
 services:
   animatch:
-    image: animatch:latest
+    # En producción la imagen llega pre-construida desde GHCR (la sube el CI/CD).
+    # Para construir en local/VM: docker compose build animatch
+    image: ghcr.io/j-cortes99/animatch:latest
     build:
       context: .
       dockerfile: Dockerfile
