@@ -18,9 +18,10 @@ Docker en una VM ARM de Oracle Cloud, con HTTPS automático (Caddy) y Gemini com
 - 🧠 **Recomendaciones por IA con proveedor conmutable** (abstracción `IChatClient`):
   **Gemini** (endpoint OpenAI-compatible) para producción, **[Ollama](https://ollama.com)**
   (gemma3) en local para desarrollo — se elige en configuración, sin tocar código.
-- 🛡️ **Pensado para exponerlo al público**: rate limiting por IP + techo diario global en los
-  endpoints que llaman al modelo, traducción acotada a sinopsis reales de MAL (por id, nunca
-  texto libre del cliente) y errores genéricos hacia el cliente (el detalle, al log).
+- 🛡️ **Pensado para exponerlo al público**: rate limiting en dos niveles (con sesión, límite
+  generoso por usuario y minuto; sin sesión, cupo de prueba por IP y día que invita a
+  loguearse) + techo diario global, traducción acotada a sinopsis reales de MAL (por id,
+  nunca texto libre del cliente) y errores genéricos hacia el cliente (el detalle, al log).
 - ⚡ **Streaming en directo**: las tarjetas van apareciendo según el modelo las genera (NDJSON).
 - 🖼️ **Fichas enriquecidas con MyAnimeList** (API pública [Jikan](https://jikan.moe)): carátula,
   nota, año, episodios, estudio, sinopsis y tráiler de YouTube.

@@ -30,9 +30,10 @@ if (!modelo.EsLocal && string.IsNullOrWhiteSpace(modelo.ApiKey))
 var limites = builder.Configuration.GetSection("Limites").Get<LimitesOptions>() ?? new LimitesOptions();
 
 // --- Rate limiting de los endpoints que cuestan dinero (modelo) ---
-// Capa 1: límite por IP y minuto (políticas "recomendaciones" y "traducir").
+// Capa 1 (políticas "recomendaciones"/"traducir"): con sesión, límite por usuario y
+// minuto; sin sesión, cupo de prueba por IP y día (el 429 invita a iniciar sesión).
 // Capa 2: techo global diario compartido (GlobalLimiter), que acota el gasto máximo
-// aunque el abuso venga repartido entre muchas IPs.
+// aunque el abuso venga repartido entre muchas IPs o cuentas.
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -40,17 +41,22 @@ builder.Services.AddRateLimiter(o =>
     {
         if (ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var espera))
             ctx.HttpContext.Response.Headers.RetryAfter = ((int)espera.TotalSeconds).ToString();
+        var anonimo = ctx.HttpContext.User.Identity?.IsAuthenticated != true;
         ctx.HttpContext.Response.ContentType = "application/problem+json";
         await ctx.HttpContext.Response.WriteAsJsonAsync(new
         {
             title = "Demasiadas peticiones",
-            detail = "Has alcanzado el límite de uso. Espera un poco y vuelve a intentarlo.",
+            detail = anonimo
+                ? "Has agotado el cupo de prueba de hoy. Inicia sesión con Google (gratis) para seguir usando AniMatch."
+                : "Has alcanzado el límite de uso. Espera un poco y vuelve a intentarlo.",
             status = StatusCodes.Status429TooManyRequests,
         }, ct);
     };
 
-    o.AddPolicy("recomendaciones", ctx => PorIp(ctx, "rec", limites.RecomendacionesPorMinutoPorIp));
-    o.AddPolicy("traducir", ctx => PorIp(ctx, "trad", limites.TraduccionesPorMinutoPorIp));
+    o.AddPolicy("recomendaciones", ctx =>
+        PorIdentidad(ctx, "rec", limites.RecomendacionesPorMinuto, limites.RecomendacionesAnonimasPorDia));
+    o.AddPolicy("traducir", ctx =>
+        PorIdentidad(ctx, "trad", limites.TraduccionesPorMinuto, limites.TraduccionesAnonimasPorDia));
 
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         ctx.Request.Path.StartsWithSegments("/api/recomendaciones")
@@ -60,10 +66,19 @@ builder.Services.AddRateLimiter(o =>
         : RateLimitPartition.GetNoLimiter("resto"));
 });
 
-static RateLimitPartition<string> PorIp(HttpContext ctx, string grupo, int porMinuto) =>
-    RateLimitPartition.GetFixedWindowLimiter(
-        $"{grupo}:{ctx.Connection.RemoteIpAddress}",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = porMinuto, Window = TimeSpan.FromMinutes(1) });
+// Con sesión: ventana de 1 minuto por usuario (el id de Google). Sin sesión: cupo
+// de prueba de 24 h por IP. Requiere UseAuthentication antes de UseRateLimiter.
+static RateLimitPartition<string> PorIdentidad(HttpContext ctx, string grupo, int porMinutoSesion, int anonimoPorDia)
+{
+    var usuario = ctx.User.Identity?.IsAuthenticated == true
+        ? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        : null;
+    return usuario is not null
+        ? RateLimitPartition.GetFixedWindowLimiter($"{grupo}:u:{usuario}",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = porMinutoSesion, Window = TimeSpan.FromMinutes(1) })
+        : RateLimitPartition.GetFixedWindowLimiter($"{grupo}:ip:{ctx.Connection.RemoteIpAddress}",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = anonimoPorDia, Window = TimeSpan.FromDays(1) });
+}
 
 static RateLimitPartition<string> PorDia(string grupo, int porDia) =>
     RateLimitPartition.GetFixedWindowLimiter(
