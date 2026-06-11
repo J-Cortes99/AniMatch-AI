@@ -8,8 +8,11 @@ u **Ollama** en tu propia GPU para desarrollo o uso 100% local.
 **🌐 En producción: [animatch.duckdns.org](https://animatch.duckdns.org)** — desplegado con
 Docker en una VM ARM de Oracle Cloud, con HTTPS automático (Caddy) y Gemini como modelo.
 
-<!-- Sube una captura a docs/ y descomenta esta línea: -->
-<!-- ![AniMatch](docs/captura.png) -->
+![AniMatch](docs/captura-portada.png)
+
+| Recomendaciones en streaming | Ficha de detalle | Móvil |
+|---|---|---|
+| ![Tarjetas](docs/captura-tarjetas.png) | ![Ficha](docs/captura-ficha.png) | ![Móvil](docs/captura-movil.png) |
 
 ---
 

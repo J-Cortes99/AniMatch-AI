@@ -16,6 +16,7 @@ on:
     paths-ignore:
       - 'README.md'
       - '.env.example'
+      - 'docs/**'
   workflow_dispatch:
 
 env:
