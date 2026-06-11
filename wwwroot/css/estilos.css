@@ -391,6 +391,46 @@ button{
 @media (max-width:520px){ .det-cab{ flex-direction:column; } .det-poster{ width:120px; } }
 
 @media (max-width:980px){ .kana-deco{ display:none; } }
+
+/* ---- Móvil ---- */
+@media (max-width:640px){
+  .wrap{ padding:1.7rem 1rem 3.5rem; }
+  .masthead{ margin-bottom:1.8rem; }
+  .kicker{ font-size:.6rem; letter-spacing:.14em; justify-content:space-between; }
+  .kicker .linea{ display:none; }
+  .lema{ font-size:.98rem; }
+
+  /* Controles: rejilla de 2 columnas con el botón principal a lo ancho */
+  .controls{ display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin:1.4rem 0 1.8rem; }
+  .controls .crece{ margin-left:0; }
+  .controls button{ width:100%; padding-left:.5rem; padding-right:.5rem; }
+  .btn-primario, #cancelar{ grid-column:1 / -1; padding-top:.85rem; padding-bottom:.85rem; }
+  .num{ grid-column:1 / -1; justify-content:space-between; }
+  .num select{ min-width:110px; text-align:center; font-size:1rem; padding:.5rem .55rem; }
+
+  /* Panel de filtros: campos a lo ancho, en 2 columnas */
+  .filtros{ padding:1rem; }
+  .filtros-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.8rem; }
+  .f-campo select{ min-width:0; width:100%; }
+  .f-check{ grid-column:1 / -1; align-self:auto; padding-bottom:0; }
+  .f-gen-buscar{ max-width:none; }
+
+  /* Sugerencias: que no se salgan de la pantalla con el teclado abierto */
+  .sugerencias{ max-height:46vh; }
+
+  /* Tarjetas algo más compactas */
+  .card{ padding:.9rem .9rem; gap:.85rem; }
+  .card-titulo{ font-size:1.16rem; }
+  .indice{ font-size:4.2rem; }
+
+  /* Modales: aprovechar la pantalla del móvil */
+  .overlay{ padding:.6rem; }
+  .modal{ padding:1.1rem; max-height:88vh; max-height:92dvh; }
+  .modal.detalle{ max-height:92vh; max-height:96dvh; padding:0; }
+  #detalleBody{ padding:1.1rem; }
+  .det-titulo{ font-size:1.3rem; }
+}
+
 @media (max-width:520px){
   .poster{ width:74px; }
   .card-titulo{ padding-right:6.8rem; }

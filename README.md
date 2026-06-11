@@ -5,6 +5,9 @@ sugiere qué ver a continuación —con carátulas, nota, sinopsis y tráiler de
 El proveedor del modelo es configurable: **Gemini** en la nube para desplegarlo multiusuario,
 u **Ollama** en tu propia GPU para desarrollo o uso 100% local.
 
+**🌐 En producción: [animatch.duckdns.org](https://animatch.duckdns.org)** — desplegado con
+Docker en una VM ARM de Oracle Cloud, con HTTPS automático (Caddy) y Gemini como modelo.
+
 <!-- Sube una captura a docs/ y descomenta esta línea: -->
 <!-- ![AniMatch](docs/captura.png) -->
 
@@ -25,6 +28,10 @@ u **Ollama** en tu propia GPU para desarrollo o uso 100% local.
   recomendarte lo que ya conoces, incluido el caso japonés↔inglés ("Shingeki no Kyojin" =
   "Attack on Titan") y sus temporadas/secuelas.
 - 🔎 **Autocompletado** de favoritos con títulos reales de MAL.
+- 👤 **Cuentas con Google** (OAuth en el servidor + cookie de sesión, el navegador nunca ve
+  tokens) y **listas sincronizadas entre dispositivos** en Postgres (JSONB, una fila por
+  usuario). El primer login migra automáticamente lo que tuvieras en localStorage; sin
+  sesión, todo sigue funcionando en local.
 - ⭐ **Listas personales** persistentes: favoritos, **pendientes** (watchlist) y descartados.
 - 🌐 **Traducción de la sinopsis** al español con el propio modelo, bajo demanda y cacheada.
 - 🖌️ **Exportar la tanda como "página de manga"** en PNG para compartir.
@@ -36,9 +43,12 @@ u **Ollama** en tu propia GPU para desarrollo o uso 100% local.
 | Capa | Tecnología |
 |------|-----------|
 | Backend | ASP.NET Core **Minimal API** (.NET 10) |
-| IA | `Microsoft.Extensions.AI` (`IChatClient`) — **Gemini** (`gemini-2.5-flash-lite`) en producción, **Ollama** + `gemma3:12b` en desarrollo |
-| Datos | API pública **Jikan** (MyAnimeList) |
-| Frontend | Una sola página, **HTML/CSS/JS vanilla** (sin frameworks) |
+| IA | `Microsoft.Extensions.AI` (`IChatClient`) — **Gemini** (`gemini-3.1-flash-lite`) en producción, **Ollama** + `gemma3:12b` en desarrollo |
+| Cuentas | OAuth de **Google** en el servidor + cookie de sesión (30 días) |
+| Base de datos | **PostgreSQL** (listas por usuario como JSONB; opcional — sin ella, localStorage) |
+| Datos de anime | API pública **Jikan** (MyAnimeList) |
+| Frontend | Una sola página, **HTML/CSS/JS vanilla** (sin frameworks), responsive |
+| Despliegue | **Docker** multi-stage (ARM64) + **Caddy** (HTTPS automático) en una VM Always Free de Oracle Cloud |
 
 ## 🚀 Cómo ejecutarlo
 
@@ -68,9 +78,34 @@ dotnet run --no-launch-profile
 
 Abre **http://localhost:5080** y añade un par de animes que te gusten.
 
+**Opcionales por variable de entorno** (sin ellas la app funciona igual, solo que sin
+login ni sincronización):
+
+| Variable | Para qué |
+|----------|----------|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Login con Google (cliente OAuth de console.cloud.google.com con redirect `…/signin-google`) |
+| `ConnectionStrings__AniMatch` (o `ANIMATCH_DB`) | Postgres para las listas por usuario (la tabla se crea sola al arrancar) |
+
 El proveedor/modelo, el timeout, los límites de uso (por IP y diarios), si usar o no Jikan
 y el modo proxy (`DetrasDeProxy`) se configuran en [`appsettings.json`](appsettings.json)
 — sin recompilar.
+
+## 🐳 Despliegue (producción)
+
+La imagen se construye con el [`Dockerfile`](Dockerfile) multi-stage (funciona en ARM64) y
+el [`docker-compose.yml`](docker-compose.yml) está pensado para convivir con otras apps
+detrás de un **Caddy** compartido: no publica puertos, se une a la red docker del proxy y
+recibe `X-Forwarded-For/Proto` (con `DetrasDeProxy=true`, ya puesto en el compose). Los
+secretos van en un `.env` junto al compose (ver [`.env.example`](.env.example)).
+
+```bash
+# en el servidor
+git clone https://github.com/J-Cortes99/AniMatch-AI.git && cd AniMatch-AI
+cp .env.example .env && nano .env     # rellena Gemini, Google y la BD
+docker compose up -d --build
+```
+
+Para actualizar: `git pull && docker compose build && docker compose up -d`.
 
 ## 🧱 Cómo funciona
 
@@ -80,16 +115,16 @@ y el modo proxy (`DetrasDeProxy`) se configuran en [`appsettings.json`](appsetti
 3. Cada recomendación se **enriquece contra MyAnimeList** (carátula, ficha) y se filtran
    alucinaciones y duplicados de serie.
 4. El frontend va pintando las tarjetas a medida que llegan (NDJSON) y guarda tus listas en
-   `localStorage`.
+   `localStorage` — y, con sesión iniciada, las sincroniza con tu cuenta (Postgres) con un
+   pequeño debounce.
 
 > La abstracción `IChatClient` de `Microsoft.Extensions.AI` es la que permite que Gemini y
 > Ollama sean intercambiables por configuración: el resto del código no sabe cuál hay detrás.
 
 ## 🗺️ Roadmap
 
-- 🐳 **Dockerfile + despliegue** en un hosting (puerto configurable vía `PORT`).
+- 🔁 **CI/CD**: push a `main` → imagen → deploy automático en la VM (como HunterVault).
 - 💾 Caché persistente de traducciones (cada sinopsis se paga una sola vez).
-- 👤 Cuentas de usuario + base de datos para sincronizar listas entre dispositivos.
 
 ## 📄 Licencia
 
