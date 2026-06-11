@@ -11,6 +11,12 @@ public sealed class LimitesOptions
     public int RecomendacionesPorMinuto { get; set; } = 6;
     public int TraduccionesPorMinuto { get; set; } = 10;
 
+    // Con sesión (por usuario y día): que un solo usuario no pueda comerse el techo
+    // global de todos. Son peticiones, no animes: una tanda gasta 1-3 peticiones,
+    // así que 20 ≈ 8-15 tandas reales.
+    public int RecomendacionesPorDiaPorUsuario { get; set; } = 20;
+    public int TraduccionesPorDiaPorUsuario { get; set; } = 30;
+
     // Sin sesión (por IP y día) — cada "tanda" del frontend puede hacer 1-3 peticiones
     public int RecomendacionesAnonimasPorDia { get; set; } = 10;
     public int TraduccionesAnonimasPorDia { get; set; } = 10;

@@ -42,13 +42,17 @@ builder.Services.AddRateLimiter(o =>
         if (ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var espera))
             ctx.HttpContext.Response.Headers.RetryAfter = ((int)espera.TotalSeconds).ToString();
         var anonimo = ctx.HttpContext.User.Identity?.IsAuthenticated != true;
+        // Espera larga = lo que saltó fue un cupo diario, no la ventana de 1 minuto.
+        var esDiario = ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var e2) && e2 > TimeSpan.FromMinutes(2);
         ctx.HttpContext.Response.ContentType = "application/problem+json";
         await ctx.HttpContext.Response.WriteAsJsonAsync(new
         {
             title = "Demasiadas peticiones",
             detail = anonimo
                 ? "Has agotado el cupo de prueba de hoy. Inicia sesión con Google (gratis) para seguir usando AniMatch."
-                : "Has alcanzado el límite de uso. Espera un poco y vuelve a intentarlo.",
+                : esDiario
+                    ? "Has alcanzado tu límite de uso por hoy. Vuelve mañana."
+                    : "Has alcanzado el límite de uso. Espera un poco y vuelve a intentarlo.",
             status = StatusCodes.Status429TooManyRequests,
         }, ct);
     };
@@ -58,12 +62,29 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("traducir", ctx =>
         PorIdentidad(ctx, "trad", limites.TraduccionesPorMinuto, limites.TraduccionesAnonimasPorDia));
 
-    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-        ctx.Request.Path.StartsWithSegments("/api/recomendaciones")
-            ? PorDia("rec", limites.RecomendacionesPorDia)
-        : ctx.Request.Path.StartsWithSegments("/api/traducir")
-            ? PorDia("trad", limites.TraduccionesPorDia)
-        : RateLimitPartition.GetNoLimiter("resto"));
+    // Dos limitadores encadenados (ambos deben dejar pasar):
+    //  1) techo global diario compartido;
+    //  2) cupo diario por usuario con sesión (los anónimos ya tienen su cupo diario
+    //     por IP en la política del endpoint).
+    o.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+        PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+            ctx.Request.Path.StartsWithSegments("/api/recomendaciones")
+                ? PorDia("rec", limites.RecomendacionesPorDia)
+            : ctx.Request.Path.StartsWithSegments("/api/traducir")
+                ? PorDia("trad", limites.TraduccionesPorDia)
+            : RateLimitPartition.GetNoLimiter("resto")),
+        PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        {
+            var usuario = ctx.User.Identity?.IsAuthenticated == true
+                ? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                : null;
+            if (usuario is null) return RateLimitPartition.GetNoLimiter("anon");
+            return ctx.Request.Path.StartsWithSegments("/api/recomendaciones")
+                ? PorDia($"rec:u:{usuario}", limites.RecomendacionesPorDiaPorUsuario)
+            : ctx.Request.Path.StartsWithSegments("/api/traducir")
+                ? PorDia($"trad:u:{usuario}", limites.TraduccionesPorDiaPorUsuario)
+            : RateLimitPartition.GetNoLimiter("resto");
+        }));
 });
 
 // Con sesión: ventana de 1 minuto por usuario (el id de Google). Sin sesión: cupo
