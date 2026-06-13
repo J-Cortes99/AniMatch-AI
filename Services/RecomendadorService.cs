@@ -135,6 +135,10 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<ModeloOptions
         if (f.SinEspeciales && f.Formato != "tv")
             reglas.Add("No recomiendes OVAs, ONAs ni especiales.");
 
+        if (f.GenerosIncluidos is { Length: > 0 })
+            reglas.Add($"El usuario quiere especialmente animes de estos géneros: {string.Join(", ", f.GenerosIncluidos)}. " +
+                "Prioriza MUCHO títulos que pertenezcan a AL MENOS UNO de ellos (no hace falta que los tengan todos).");
+
         if (f.GenerosExcluidos is { Length: > 0 })
             reglas.Add($"Evita por completo estos géneros: {string.Join(", ", f.GenerosExcluidos)}.");
 

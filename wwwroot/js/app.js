@@ -186,37 +186,65 @@ const GENEROS = [
 const ETIQUETA_GEN = Object.fromEntries(GENEROS.map(([es, mal]) => [mal, es]));
 const normGen = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
 
-let genSug = [], genSugActiva = -1;
+// Dos selectores de géneros idénticos: incluir (pista para el modelo) y excluir
+// (filtro duro). Comparten el catálogo; cada uno gestiona su lista en `filtros` y,
+// al añadir un género, lo quita del otro para que no haya contradicciones.
+const PICKERS = [
+  { campo: 'generosIncluidos', otro: 'generosExcluidos', input: 'fGenIncBuscar', sug: 'fGenIncSug', chips: 'fGenIncSel', clase: 'incluido', quitar: 'Quitar' },
+  { campo: 'generosExcluidos', otro: 'generosIncluidos', input: 'fGenBuscar',    sug: 'fGenSug',    chips: 'fGenSel',    clase: 'activo',   quitar: 'Quitar exclusión' },
+];
 
-// Chips de los géneros ya excluidos (tachados, con ✕ para quitar).
-function pintarGenerosSel() {
-  $('fGenSel').innerHTML = filtros.generosExcluidos.map(mal =>
-    `<button type="button" class="f-gen activo" data-mal="${esc(mal)}" title="Quitar exclusión">${esc(ETIQUETA_GEN[mal] || mal)} ✕</button>`
-  ).join('');
+// Repinta los chips de ambos selectores (añadir en uno puede mover un género del otro).
+function pintarGeneros() {
+  for (const p of PICKERS) {
+    $(p.chips).innerHTML = filtros[p.campo].map(mal =>
+      `<button type="button" class="f-gen ${p.clase}" data-mal="${esc(mal)}" title="${p.quitar}">${esc(ETIQUETA_GEN[mal] || mal)} ✕</button>`
+    ).join('');
+  }
 }
-// Sugerencias del buscador: filtra el catálogo por etiqueta o nombre de MAL, sin los ya elegidos.
-function pintarGenSug(q) {
-  const t = normGen(q);
-  genSug = t
-    ? GENEROS.filter(([es, mal]) =>
-        !filtros.generosExcluidos.includes(mal) &&
-        (normGen(es).includes(t) || mal.toLowerCase().includes(t))).slice(0, 8)
-    : [];
-  if (genSugActiva >= genSug.length) genSugActiva = -1;
-  if (!genSug.length) { $('fGenSug').hidden = true; $('fGenSug').innerHTML = ''; return; }
-  $('fGenSug').innerHTML = genSug.map(([es, mal], i) =>
-    `<div class="f-sug-item${i === genSugActiva ? ' activa' : ''}" data-mal="${esc(mal)}">${esc(es)}</div>`).join('');
-  $('fGenSug').hidden = false;
-}
-function excluirGenero(mal) {
-  if (mal && !filtros.generosExcluidos.includes(mal)) filtros.generosExcluidos.push(mal);
-  guardarFiltros();
-  $('fGenBuscar').value = ''; genSugActiva = -1; pintarGenSug('');
-  pintarGenerosSel(); actualizarBotonFiltros();
+
+// Conecta un selector (autocompletado + chips) sobre su lista de `filtros`.
+function montarPicker(p) {
+  let sug = [], activa = -1;
+  const pintarSug = q => {
+    const t = normGen(q);
+    sug = t ? GENEROS.filter(([es, mal]) =>
+      !filtros[p.campo].includes(mal) &&
+      (normGen(es).includes(t) || mal.toLowerCase().includes(t))).slice(0, 8) : [];
+    if (activa >= sug.length) activa = -1;
+    if (!sug.length) { $(p.sug).hidden = true; $(p.sug).innerHTML = ''; return; }
+    $(p.sug).innerHTML = sug.map(([es, mal], i) =>
+      `<div class="f-sug-item${i === activa ? ' activa' : ''}" data-mal="${esc(mal)}">${esc(es)}</div>`).join('');
+    $(p.sug).hidden = false;
+  };
+  const anadir = mal => {
+    if (!mal) return;
+    if (!filtros[p.campo].includes(mal)) filtros[p.campo].push(mal);
+    const j = filtros[p.otro].indexOf(mal);          // sin contradicciones: lo saca del otro
+    if (j >= 0) filtros[p.otro].splice(j, 1);
+    guardarFiltros();
+    $(p.input).value = ''; activa = -1; pintarSug('');
+    pintarGeneros(); actualizarBotonFiltros();
+  };
+  $(p.input).oninput = e => { activa = -1; pintarSug(e.target.value); };
+  $(p.input).onkeydown = e => {
+    if (e.key === 'ArrowDown' && sug.length) { e.preventDefault(); activa = (activa + 1) % sug.length; pintarSug(e.target.value); return; }
+    if (e.key === 'ArrowUp' && sug.length)   { e.preventDefault(); activa = (activa - 1 + sug.length) % sug.length; pintarSug(e.target.value); return; }
+    if (e.key === 'Enter') { e.preventDefault(); const s = activa >= 0 ? sug[activa] : sug[0]; if (s) anadir(s[1]); return; }
+    if (e.key === 'Escape') { $(p.sug).hidden = true; activa = -1; }
+  };
+  $(p.sug).onclick = e => { const it = e.target.closest('.f-sug-item'); if (it) anadir(it.dataset.mal); };
+  $(p.chips).onclick = e => {
+    const b = e.target.closest('.f-gen'); if (!b) return;
+    const i = filtros[p.campo].indexOf(b.dataset.mal);
+    if (i >= 0) filtros[p.campo].splice(i, 1);
+    guardarFiltros(); pintarGeneros(); actualizarBotonFiltros(); pintarSug($(p.input).value);
+  };
 }
 function contarFiltros() {
   return (filtros.formato !== 'todo') + (filtros.duracion !== 'cualquiera')
-    + (filtros.notaMinima > 0) + (filtros.sinEspeciales ? 1 : 0) + filtros.generosExcluidos.length;
+    + (filtros.notaMinima > 0) + (filtros.sinEspeciales ? 1 : 0)
+    + filtros.generosIncluidos.length + filtros.generosExcluidos.length;
 }
 function actualizarBotonFiltros() {
   const n = contarFiltros();
@@ -228,7 +256,7 @@ function inicializarFiltros() {
   $('fDuracion').value = filtros.duracion;
   $('fNota').value = String(filtros.notaMinima || 0);
   $('fSinEspeciales').checked = !!filtros.sinEspeciales;
-  pintarGenerosSel();
+  pintarGeneros();
   actualizarBotonFiltros();
 }
 $('verFiltros').onclick = () => {
@@ -241,23 +269,11 @@ $('fDuracion').onchange = e => { filtros.duracion = e.target.value; guardarFiltr
 $('fNota').onchange = e => { filtros.notaMinima = parseFloat(e.target.value) || 0; guardarFiltros(); actualizarBotonFiltros(); };
 $('fSinEspeciales').onchange = e => { filtros.sinEspeciales = e.target.checked; guardarFiltros(); actualizarBotonFiltros(); };
 
-// Buscador de géneros a excluir (autocompletado local sobre el catálogo de MAL).
-$('fGenBuscar').oninput = e => { genSugActiva = -1; pintarGenSug(e.target.value); };
-$('fGenBuscar').onkeydown = e => {
-  if (e.key === 'ArrowDown' && genSug.length) { e.preventDefault(); genSugActiva = (genSugActiva + 1) % genSug.length; pintarGenSug(e.target.value); return; }
-  if (e.key === 'ArrowUp' && genSug.length)   { e.preventDefault(); genSugActiva = (genSugActiva - 1 + genSug.length) % genSug.length; pintarGenSug(e.target.value); return; }
-  if (e.key === 'Enter') { e.preventDefault(); const p = genSugActiva >= 0 ? genSug[genSugActiva] : genSug[0]; if (p) excluirGenero(p[1]); return; }
-  if (e.key === 'Escape') { $('fGenSug').hidden = true; genSugActiva = -1; }
-};
-$('fGenSug').onclick = e => { const it = e.target.closest('.f-sug-item'); if (it) excluirGenero(it.dataset.mal); };
-$('fGenSel').onclick = e => {
-  const b = e.target.closest('.f-gen');
-  if (!b) return;
-  const i = filtros.generosExcluidos.indexOf(b.dataset.mal);
-  if (i >= 0) filtros.generosExcluidos.splice(i, 1);
-  guardarFiltros(); pintarGenerosSel(); actualizarBotonFiltros(); pintarGenSug($('fGenBuscar').value);
-};
-document.addEventListener('click', e => { if (!e.target.closest('.f-gen-buscar')) $('fGenSug').hidden = true; });
+// Monta ambos selectores de géneros (incluir / excluir).
+PICKERS.forEach(montarPicker);
+document.addEventListener('click', e => {
+  if (!e.target.closest('.f-gen-buscar')) { $('fGenSug').hidden = true; $('fGenIncSug').hidden = true; }
+});
 
 // ---- Pintar recomendaciones (con tarjeta de "cargando"/"sin resultados" al final) ----
 function pintarRecomendaciones() {

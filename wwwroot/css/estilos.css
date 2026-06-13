@@ -183,7 +183,10 @@ button{
   font-size:.78rem; color:var(--papel-2); user-select:none;
 }
 .f-check input{ accent-color:var(--bermellon); width:16px; height:16px; cursor:pointer; }
-.f-generos{ margin-top:1.2rem; border-top:1.5px solid var(--borde); padding-top:1rem; }
+.f-generos{ margin-top:1.2rem; border-top:1.5px solid var(--borde); padding-top:1rem;
+  display:grid; grid-template-columns:1fr 1fr; gap:1.2rem 1.6rem; }
+.f-gen-col{ min-width:0; }
+.f-gen-col .f-gen-buscar{ max-width:none; }
 .f-label{
   display:block; font-family:"Anton",sans-serif; letter-spacing:.18em; text-transform:uppercase;
   font-size:.72rem; color:var(--tenue); margin-bottom:.6rem;
@@ -199,6 +202,8 @@ button{
   background:var(--bermellon); border-color:var(--bermellon); color:var(--papel);
   text-decoration:line-through; text-decoration-thickness:1.5px;
 }
+/* Géneros incluidos: seleccionados en positivo (sin tachar). */
+.f-gen.incluido{ background:var(--bermellon); border-color:var(--bermellon); color:var(--papel); }
 /* Buscador de géneros (autocompletado local sobre el catálogo de MAL) */
 .f-gen-buscar{ position:relative; max-width:340px; margin-bottom:.75rem; }
 .f-gen-buscar input{
@@ -413,6 +418,7 @@ button{
   .filtros-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.8rem; }
   .f-campo select{ min-width:0; width:100%; }
   .f-check{ grid-column:1 / -1; align-self:auto; padding-bottom:0; }
+  .f-generos{ grid-template-columns:1fr; gap:1.1rem; }
   .f-gen-buscar{ max-width:none; }
 
   /* Sugerencias: que no se salgan de la pantalla con el teclado abierto */

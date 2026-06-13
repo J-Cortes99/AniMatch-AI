@@ -8,6 +8,7 @@ public record Filtros(
     string? Formato = null,             // "tv" = solo series | "pelicula" = solo películas | null = cualquiera
     bool SinEspeciales = false,         // excluir OVA / ONA / Special / Music
     string[]? GenerosExcluidos = null,  // nombres de género de MAL en inglés (Action, Horror, Ecchi…)
+    string[]? GenerosIncluidos = null,  // géneros que el usuario quiere; pista (OR) para el prompt
     double? NotaMinima = null,          // nota mínima de MAL (1-10)
     string? Duracion = null)            // "corta" (≤13) | "media" (14-26) | "larga" (>26), por episodios
 {
@@ -16,12 +17,16 @@ public record Filtros(
     // coinciden exactamente con los valores conocidos.
     public Filtros Saneados() => this with
     {
-        GenerosExcluidos = (GenerosExcluidos ?? [])
+        GenerosExcluidos = LimpiarGeneros(GenerosExcluidos),
+        GenerosIncluidos = LimpiarGeneros(GenerosIncluidos),
+        NotaMinima = NotaMinima is { } n && !double.IsNaN(n) ? Math.Clamp(n, 0, 10) : null,
+    };
+
+    private static string[] LimpiarGeneros(string[]? generos) =>
+        (generos ?? [])
             .Select(g => System.Text.RegularExpressions.Regex.Replace(g ?? "", @"[\s\p{C}]+", " ").Trim())
             .Where(g => g.Length is > 0 and <= 40)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(20)
-            .ToArray(),
-        NotaMinima = NotaMinima is { } n && !double.IsNaN(n) ? Math.Clamp(n, 0, 10) : null,
-    };
+            .ToArray();
 }

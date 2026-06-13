@@ -77,12 +77,22 @@
         <label class="f-check"><input type="checkbox" id="fSinEspeciales"> Sin OVAs / especiales</label>
       </div>
       <div class="f-generos">
-        <span class="f-label">Excluir géneros</span>
-        <div class="f-gen-buscar">
-          <input id="fGenBuscar" type="text" placeholder="Busca un género y añádelo…" autocomplete="off">
-          <div class="sugerencias f-gen-sug" id="fGenSug" hidden></div>
+        <div class="f-gen-col">
+          <span class="f-label">Incluir géneros</span>
+          <div class="f-gen-buscar">
+            <input id="fGenIncBuscar" type="text" placeholder="Busca un género y añádelo…" autocomplete="off">
+            <div class="sugerencias f-gen-sug" id="fGenIncSug" hidden></div>
+          </div>
+          <div class="f-chips" id="fGenIncSel"></div>
         </div>
-        <div class="f-chips" id="fGenSel"></div>
+        <div class="f-gen-col">
+          <span class="f-label">Excluir géneros</span>
+          <div class="f-gen-buscar">
+            <input id="fGenBuscar" type="text" placeholder="Busca un género y añádelo…" autocomplete="off">
+            <div class="sugerencias f-gen-sug" id="fGenSug" hidden></div>
+          </div>
+          <div class="f-chips" id="fGenSel"></div>
+        </div>
       </div>
     </section>
 

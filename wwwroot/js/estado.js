@@ -16,7 +16,7 @@ export const pendientes = JSON.parse(localStorage.getItem(CLAVE_PEND) || '[]');
 export const recomendaciones = [];   // lo que hay ahora en pantalla (se limpia con .length = 0)
 
 // Filtros de recomendación (objeto 'const': se mutan sus propiedades, nunca se reasigna).
-const FILTROS_DEF = { formato: 'todo', sinEspeciales: false, generosExcluidos: [], notaMinima: 0, duracion: 'cualquiera' };
+const FILTROS_DEF = { formato: 'todo', sinEspeciales: false, generosIncluidos: [], generosExcluidos: [], notaMinima: 0, duracion: 'cualquiera' };
 export const filtros = Object.assign({}, FILTROS_DEF, JSON.parse(localStorage.getItem(CLAVE_FILTROS) || '{}'));
 
 // Aviso de cambios: app.js registra aquí la subida a la nube (con sesión iniciada).

@@ -9,6 +9,7 @@ function serializarFiltros() {
   return {
     formato: filtros.formato === 'todo' ? null : filtros.formato,
     sinEspeciales: !!filtros.sinEspeciales,
+    generosIncluidos: filtros.generosIncluidos,
     generosExcluidos: filtros.generosExcluidos,
     notaMinima: filtros.notaMinima || null,
     duracion: filtros.duracion === 'cualquiera' ? null : filtros.duracion,
