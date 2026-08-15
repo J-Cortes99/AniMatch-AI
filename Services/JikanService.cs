@@ -39,23 +39,33 @@ public sealed class JikanService
     public async Task<Anime?> EnriquecerAsync(
         Anime anime, IEnumerable<string> exclusiones, Filtros? filtros, CancellationToken ct)
     {
-        Ficha? ficha;
+        var exclusionesList = exclusiones.ToList();
+        Ficha? ficha = null;
         try
         {
             ficha = await BuscarAsync(anime.Titulo, ct);
         }
         catch
         {
-            return anime;   // Jikan caído o lento: lo mostramos sin carátula, no rompemos
+            // Jikan caído, 429/403 o lento: verificamos dedup básico por título y lo mostramos sin carátula
+            if (exclusionesList.Any(ex => MismaSerie(anime.Titulo, ex)))
+                return null;
+            return anime;
         }
 
         if (ficha is null)
-            return null;    // no existe en MAL: probable alucinación → fuera
+        {
+            // Si Jikan no encuentra la ficha (título en español o sin coincidencia exacta en MAL),
+            // se verifica dedup por título y se devuelve la recomendación de la IA sin carátula en vez de tirarla.
+            if (exclusionesList.Any(ex => MismaSerie(anime.Titulo, ex)))
+                return null;
+            return anime;
+        }
 
         // Dedup: si cualquier título/sinónimo de la ficha es la misma serie que un
         // favorito, descartado o pendiente, no la recomendamos.
         var titulos = ficha.TodosLosTitulos().ToList();
-        foreach (var ex in exclusiones)
+        foreach (var ex in exclusionesList)
             if (titulos.Any(t => MismaSerie(t, ex)))
                 return null;
 
@@ -197,10 +207,33 @@ public sealed class JikanService
             _ultimaLlamada = DateTime.UtcNow;
 
             if (!resp.IsSuccessStatusCode)
-                return null;   // 429/5xx: no cacheamos; el siguiente intento podrá reintentar
+                throw new HttpRequestException($"Jikan API devolvió HTTP {(int)resp.StatusCode}");
 
             var datos = await resp.Content.ReadFromJsonAsync<Respuesta>(JsonOpts, ct);
             var ficha = datos?.Data?.FirstOrDefault();
+
+            // Si no se encuentra con el título exacto y contiene paréntesis (p. ej. " (2011)"),
+            // probar una búsqueda alternativa sin el texto entre paréntesis.
+            if (ficha is null && titulo.Contains('('))
+            {
+                var tituloLimpio = Regex.Replace(titulo, @"\s*\([^)]*\)", "").Trim();
+                if (tituloLimpio.Length > 0 && !tituloLimpio.Equals(titulo, StringComparison.OrdinalIgnoreCase))
+                {
+                    espera = _ultimaLlamada + Intervalo - DateTime.UtcNow;
+                    if (espera > TimeSpan.Zero) await Task.Delay(espera, ct);
+
+                    using var resp2 = await client.GetAsync(
+                        $"anime?q={Uri.EscapeDataString(tituloLimpio)}&limit=1", ct);
+                    _ultimaLlamada = DateTime.UtcNow;
+
+                    if (resp2.IsSuccessStatusCode)
+                    {
+                        var datos2 = await resp2.Content.ReadFromJsonAsync<Respuesta>(JsonOpts, ct);
+                        ficha = datos2?.Data?.FirstOrDefault();
+                    }
+                }
+            }
+
             _cache.Set(clave, new Resultado(ficha), TimeSpan.FromHours(6));
             return ficha;
         }

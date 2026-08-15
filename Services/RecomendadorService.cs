@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using AnimeRecommender.Models;
@@ -59,7 +60,11 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<ModeloOptions
                     var json = buffer.ToString(inicio, buffer.Length - inicio);
 
                     Anime? anime = null;
-                    try { anime = JsonSerializer.Deserialize<Anime>(json, JsonOpts); }
+                    try
+                    {
+                        var raw = JsonSerializer.Deserialize<RawAnimeDTO>(json, JsonOpts);
+                        anime = raw?.ToAnime();
+                    }
                     catch (JsonException) { /* objeto con forma rara: lo ignoramos */ }
 
                     if (anime is { Titulo.Length: > 0 })
@@ -99,9 +104,7 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<ModeloOptions
             (p. ej. el nombre en japonés y en inglés: "Shingeki no Kyojin" =
             "Attack on Titan"), así como sus secuelas, temporadas y spin-offs.
 
-            En "titulo" usa UN único nombre, el más conocido en español o inglés. NO añadas
-            el nombre japonés ni su transliteración (romaji) ni una traducción entre paréntesis
-            (p. ej. escribe "My Hero Academia", NO "My Hero Academia (Boku no Hero Academia)").
+            En "titulo" usa el nombre oficial en inglés o romaji más conocido (p. ej. "Attack on Titan", "Demon Slayer", "My Hero Academia", "Steins;Gate"), o en español si es su título oficial más común. NO añadas traducciones entre paréntesis ni nombres dobles.
             Sí puedes conservar entre paréntesis datos que distingan la versión, como el año
             o el nombre de la temporada/ruta (p. ej. "Hunter x Hunter (2011)").
 
@@ -116,6 +119,56 @@ public sealed class RecomendadorService(IChatClient chat, IOptions<ModeloOptions
 
             Escribe en español. No inventes animes que no existan.
             """;
+    }
+
+    private sealed class RawAnimeDTO
+    {
+        [JsonPropertyName("titulo")]
+        public string? Titulo { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { set => Titulo ??= value; }
+
+        [JsonPropertyName("nombre")]
+        public string? Nombre { set => Titulo ??= value; }
+
+        [JsonPropertyName("motivo")]
+        public string? Motivo { get; set; }
+
+        [JsonPropertyName("reason")]
+        public string? Reason { set => Motivo ??= value; }
+
+        [JsonPropertyName("descripcion")]
+        public string? Descripcion { set => Motivo ??= value; }
+
+        [JsonPropertyName("generos")]
+        public JsonElement GenerosElement { get; set; }
+
+        [JsonPropertyName("genres")]
+        public JsonElement GenresElement { set => GenerosElement = value; }
+
+        public Anime? ToAnime()
+        {
+            var tit = Titulo?.Trim();
+            if (string.IsNullOrEmpty(tit)) return null;
+
+            var mot = Motivo?.Trim() ?? "";
+
+            var listGeneros = new List<string>();
+            if (GenerosElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var elem in GenerosElement.EnumerateArray())
+                    if (elem.GetString() is { Length: > 0 } g) listGeneros.Add(g);
+            }
+            else if (GenerosElement.ValueKind == JsonValueKind.String)
+            {
+                var str = GenerosElement.GetString();
+                if (!string.IsNullOrEmpty(str))
+                    listGeneros.AddRange(str.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+
+            return new Anime(tit, mot, listGeneros.ToArray());
+        }
     }
 
     // Convierte los filtros del usuario en reglas para el prompt. No es la garantía final
