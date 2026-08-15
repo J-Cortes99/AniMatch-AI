@@ -47,16 +47,19 @@ public sealed class JikanService
         }
         catch
         {
-            // Jikan caído, 429/403 o lento: verificamos dedup básico por título y lo mostramos sin carátula
-            if (exclusionesList.Any(ex => MismaSerie(anime.Titulo, ex)))
-                return null;
-            return anime;
+            // Jikan caído o 504/429/403: probamos AniList como fallback automático
+            ficha = await BuscarAniListAsync(anime.Titulo, ct);
         }
 
         if (ficha is null)
         {
-            // Si Jikan no encuentra la ficha (título en español o sin coincidencia exacta en MAL),
-            // se verifica dedup por título y se devuelve la recomendación de la IA sin carátula en vez de tirarla.
+            // Si Jikan devolvió 200 sin resultados, probamos AniList
+            ficha = await BuscarAniListAsync(anime.Titulo, ct);
+        }
+
+        if (ficha is null)
+        {
+            // Si ni Jikan ni AniList lo encontraron, devolvemos la recomendación sin carátula
             if (exclusionesList.Any(ex => MismaSerie(anime.Titulo, ex)))
                 return null;
             return anime;
@@ -69,8 +72,7 @@ public sealed class JikanService
             if (titulos.Any(t => MismaSerie(t, ex)))
                 return null;
 
-        // Filtro duro contra los datos reales de MAL (tipo, géneros, nota, episodios) +
-        // bloqueo de contenido adulto por defecto.
+        // Filtro duro contra los datos reales de MAL/AniList + bloqueo de contenido adulto por defecto.
         if (!PasaFiltro(ficha, filtros))
             return null;
 
@@ -84,7 +86,7 @@ public sealed class JikanService
             Anio = ficha.AnioEstreno,
             Episodios = ficha.Episodes,
             Sinopsis = LimpiarSinopsis(ficha.Synopsis),
-            TrailerId = ficha.Trailer?.Id,
+            TrailerId = ficha.TrailerIdDirecto ?? ficha.Trailer?.Id,
             Estudio = ficha.Studios?.FirstOrDefault()?.Name,
         };
     }
@@ -271,6 +273,119 @@ public sealed class JikanService
         }
     }
 
+    private async Task<Ficha?> BuscarAniListAsync(string titulo, CancellationToken ct)
+    {
+        var clave = "anilist:" + Norm(titulo);
+        if (_cache.TryGetValue(clave, out Resultado? cacheado))
+            return cacheado!.Ficha;
+
+        try
+        {
+            var client = _factory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            var payload = new
+            {
+                query = @"
+                query ($search: String) {
+                  Media (search: $search, type: ANIME) {
+                    id
+                    siteUrl
+                    title { romaji english native }
+                    coverImage { large }
+                    meanScore
+                    episodes
+                    seasonYear
+                    description(asHtml: false)
+                    type
+                    genres
+                    trailer { id site }
+                    studios(isMain: true) { nodes { name } }
+                  }
+                }",
+                variables = new { search = titulo }
+            };
+
+            using var resp = await client.PostAsJsonAsync("https://graphql.anilist.co", payload, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>(ct);
+            if (!json.TryGetProperty("data", out var data) ||
+                !data.TryGetProperty("Media", out var media) ||
+                media.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var titleObj = media.TryGetProperty("title", out var tObj) ? tObj : default;
+            var titleRomaji = titleObj.TryGetProperty("romaji", out var r) ? r.GetString() : null;
+            var titleEng = titleObj.TryGetProperty("english", out var e) ? e.GetString() : null;
+
+            var coverObj = media.TryGetProperty("coverImage", out var c) ? c : default;
+            var img = coverObj.TryGetProperty("large", out var l) ? l.GetString() : null;
+
+            double? score = media.TryGetProperty("meanScore", out var s) && s.ValueKind == JsonValueKind.Number
+                ? Math.Round(s.GetDouble() / 10.0, 1)
+                : null;
+
+            int? year = media.TryGetProperty("seasonYear", out var y) && y.ValueKind == JsonValueKind.Number ? y.GetInt32() : null;
+            int? ep = media.TryGetProperty("episodes", out var epElem) && epElem.ValueKind == JsonValueKind.Number ? epElem.GetInt32() : null;
+            var desc = media.TryGetProperty("description", out var dElem) ? dElem.GetString() : null;
+            var url = media.TryGetProperty("siteUrl", out var uElem) ? uElem.GetString() : null;
+            var type = media.TryGetProperty("type", out var tElem) ? tElem.GetString() : "TV";
+
+            string? trailerId = null;
+            if (media.TryGetProperty("trailer", out var tr) && tr.ValueKind == JsonValueKind.Object)
+            {
+                var site = tr.TryGetProperty("site", out var st) ? st.GetString() : null;
+                if (string.Equals(site, "youtube", StringComparison.OrdinalIgnoreCase) &&
+                    tr.TryGetProperty("id", out var trId))
+                    trailerId = trId.GetString();
+            }
+
+            var studiosList = new List<Studio>();
+            if (media.TryGetProperty("studios", out var stObj) &&
+                stObj.TryGetProperty("nodes", out var stNodes) &&
+                stNodes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var stItem in stNodes.EnumerateArray())
+                {
+                    if (stItem.TryGetProperty("name", out var stName) && stName.GetString() is { Length: > 0 } name)
+                        studiosList.Add(new Studio { Name = name });
+                }
+            }
+
+            var genresList = new List<NombreMal>();
+            if (media.TryGetProperty("genres", out var gArr) && gArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var gItem in gArr.EnumerateArray())
+                    if (gItem.GetString() is { Length: > 0 } gName)
+                        genresList.Add(new NombreMal { Name = gName });
+            }
+
+            var ficha = new Ficha
+            {
+                MalId = media.TryGetProperty("id", out var idElem) ? idElem.GetInt32() : null,
+                Title = titleRomaji ?? titleEng ?? titulo,
+                TitleEnglish = titleEng,
+                Url = url,
+                Score = score,
+                Episodes = ep,
+                Year = year,
+                Synopsis = desc,
+                Type = type,
+                TrailerIdDirecto = trailerId,
+                ImagenDirecta = img,
+                Studios = studiosList,
+                Genres = genresList,
+            };
+
+            _cache.Set(clave, new Resultado(ficha), TimeSpan.FromHours(24));
+            return ficha;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // Quita las coletillas de atribución que MAL pega al final de muchas sinopsis:
     // "[Written by MAL Rewrite]", "(Source: Crunchyroll)", "[Source: ...]", etc.
     private static string? LimpiarSinopsis(string? s)
@@ -369,8 +484,10 @@ public sealed class JikanService
         public List<NombreMal>? Genres { get; set; }
         public List<NombreMal>? Themes { get; set; }
         public List<NombreMal>? Demographics { get; set; }
+        public string? ImagenDirecta { get; set; }
+        public string? TrailerIdDirecto { get; set; }
 
-        public string? Imagen => Images?.Jpg?.ImageUrl;
+        public string? Imagen => ImagenDirecta ?? Images?.Jpg?.ImageUrl;
         // El campo "year" a veces viene null; caemos a la fecha de emisión.
         public int? AnioEstreno => Year ?? Aired?.Prop?.From?.Year;
 
