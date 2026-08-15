@@ -185,18 +185,26 @@ public sealed class JikanService
         }
     }
 
+    private DateTime _circuitoAbiertoHasta = DateTime.MinValue;
+    private int _consecutivosFallos = 0;
+
     private async Task<Ficha?> BuscarAsync(string titulo, CancellationToken ct)
     {
         var clave = "jikan:" + Norm(titulo);
         if (_cache.TryGetValue(clave, out Resultado? cacheado))
             return cacheado!.Ficha;
 
+        if (DateTime.UtcNow < _circuitoAbiertoHasta)
+            throw new HttpRequestException("Jikan circuito abierto por rate limit");
+
         await _puerta.WaitAsync(ct);
         try
         {
-            // Por si otro hilo lo cacheó mientras esperábamos la puerta.
             if (_cache.TryGetValue(clave, out cacheado))
                 return cacheado!.Ficha;
+
+            if (DateTime.UtcNow < _circuitoAbiertoHasta)
+                throw new HttpRequestException("Jikan circuito abierto por rate limit");
 
             var espera = _ultimaLlamada + Intervalo - DateTime.UtcNow;
             if (espera > TimeSpan.Zero) await Task.Delay(espera, ct);
@@ -207,7 +215,17 @@ public sealed class JikanService
             _ultimaLlamada = DateTime.UtcNow;
 
             if (!resp.IsSuccessStatusCode)
+            {
+                _consecutivosFallos++;
+                if (_consecutivosFallos >= 3)
+                {
+                    _circuitoAbiertoHasta = DateTime.UtcNow.AddSeconds(90);
+                    _consecutivosFallos = 0;
+                }
                 throw new HttpRequestException($"Jikan API devolvió HTTP {(int)resp.StatusCode}");
+            }
+
+            _consecutivosFallos = 0;
 
             var datos = await resp.Content.ReadFromJsonAsync<Respuesta>(JsonOpts, ct);
             var ficha = datos?.Data?.FirstOrDefault();
@@ -234,8 +252,18 @@ public sealed class JikanService
                 }
             }
 
-            _cache.Set(clave, new Resultado(ficha), TimeSpan.FromHours(6));
+            _cache.Set(clave, new Resultado(ficha), TimeSpan.FromHours(24));
             return ficha;
+        }
+        catch
+        {
+            _consecutivosFallos++;
+            if (_consecutivosFallos >= 3)
+            {
+                _circuitoAbiertoHasta = DateTime.UtcNow.AddSeconds(90);
+                _consecutivosFallos = 0;
+            }
+            throw;
         }
         finally
         {

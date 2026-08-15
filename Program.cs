@@ -165,8 +165,8 @@ builder.Services.AddHttpClient();   // chequeo de salud de Ollama + proxy de imÃ
 builder.Services.AddHttpClient("jikan", c =>
 {
     c.BaseAddress = new Uri("https://api.jikan.moe/v4/");
-    c.Timeout = TimeSpan.FromSeconds(8);
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("AniMatch/1.0");
+    c.Timeout = TimeSpan.FromSeconds(5);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 });
 
 // --- Base de datos (Postgres) para las listas por usuario ---
