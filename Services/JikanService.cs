@@ -88,6 +88,7 @@ public sealed class JikanService
             Sinopsis = LimpiarSinopsis(ficha.Synopsis),
             TrailerId = ficha.TrailerIdDirecto ?? ficha.Trailer?.Id,
             Estudio = ficha.Studios?.FirstOrDefault()?.Name,
+            Proveedor = ficha.Proveedor,
         };
     }
 
@@ -375,6 +376,7 @@ public sealed class JikanService
                 ImagenDirecta = img,
                 Studios = studiosList,
                 Genres = genresList,
+                Proveedor = "AniList",
             };
 
             _cache.Set(clave, new Resultado(ficha), TimeSpan.FromHours(24));
@@ -486,6 +488,7 @@ public sealed class JikanService
         public List<NombreMal>? Demographics { get; set; }
         public string? ImagenDirecta { get; set; }
         public string? TrailerIdDirecto { get; set; }
+        public string Proveedor { get; set; } = "MyAnimeList";
 
         public string? Imagen => ImagenDirecta ?? Images?.Jpg?.ImageUrl;
         // El campo "year" a veces viene null; caemos a la fecha de emisión.

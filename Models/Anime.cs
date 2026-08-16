@@ -8,4 +8,4 @@ public record Anime(
     string? Imagen = null, string? Url = null,
     double? Nota = null, int? Anio = null, int? Episodios = null,
     string? Sinopsis = null, string? TrailerId = null, string? Estudio = null,
-    int? MalId = null);
+    int? MalId = null, string? Proveedor = null);

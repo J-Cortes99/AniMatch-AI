@@ -495,7 +495,7 @@ function abrirDetalle(a) {
   detalleActual = a;
   const poster = a.imagen ? `<img class="det-poster" src="${esc(a.imagen)}" alt="">` : '';
   const mal = a.url
-    ? `<a class="det-mal" href="${esc(a.url)}" target="_blank" rel="noopener">Ver en MyAnimeList ↗</a>` : '';
+    ? `<a class="det-mal" href="${esc(a.url)}" target="_blank" rel="noopener">Ver en ${esc(a.proveedor || 'MyAnimeList')} ↗</a>` : '';
   const generos = (a.generos || []).map(g => `<small>${esc(g)}</small>`).join('');
   const trailer = a.trailerId
     ? `<div class="det-bloque"><span class="et">Tráiler</span>
